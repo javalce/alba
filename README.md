@@ -24,7 +24,7 @@ This repository contains the implementation of a fully private, fully offline, L
    ```
 3. Install dependencies:
    ```bash
-   # Add commands to install required dependencies
+   poetry install
    ```
 
 ## Usage
@@ -32,27 +32,17 @@ This repository contains the implementation of a fully private, fully offline, L
 Launch the chatbot by running:
 
 ```bash
-# Add command to run your chatbot
+streamlit run main.py
 ```
 
-Interact with the chatbot through the command line interface or the provided GUI (if applicable).
+Interact with the chatbot through the streamlit GUI.
 
 ## Configuration
 
-To configure the chatbot settings, refer to the `config.json` file where you can adjust various parameters such as model settings, privacy options, etc.
+To configure the chatbot settings, refer to the `config/config.json` file where you can adjust various parameters such as model settings, privacy options, etc.
 
-## Contributing
-
-We welcome contributions to improve the chatbot's functionalities. Please read `CONTRIBUTING.md` for details on our code of conduct, and the process for submitting pull requests.
 
 ## License
 
 This project is licensed under the MIT License - see the `LICENSE` file for details.
 
-## Acknowledgements
-
-- Mention any libraries or frameworks used
-- Credits to any third-party assets or data
-- Any collaborators or contributors
-
-Thank you for exploring our Private Offline LLM-Powered RAG Chatbot!

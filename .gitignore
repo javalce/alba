@@ -25,5 +25,9 @@ db/
 # Editors and IDEs
 .vscode/
 
+# Data files
+*.pkl
+*.csv
+*.blob
 
 

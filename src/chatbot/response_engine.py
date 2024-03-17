@@ -46,7 +46,9 @@ class ResponseEngine:
         ]
 
         # Send the messages to the chat model
-        response = chat(Config.get("inference_model"), messages=messages, stream=False)
+        response = chat(
+            Config.get("default_inference_model"), messages=messages, stream=False
+        )
 
         return response["message"]["content"]
 

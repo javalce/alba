@@ -5,6 +5,7 @@ from config.config import Config
 from src.chatbot.chatbot import Chatbot
 
 
+# TODO: Empty database, load more data, connect backend-frontend
 def main():
     # Configure your page with a logo
     st.set_page_config(
@@ -43,6 +44,8 @@ def main():
 
 
 if __name__ == "__main__":
+    # TODO: Move this back into main function and empty database
+    # as part of the initialization in DEV mode
     initial_files = []
     folder = Config.get("raw_data_folder")
     for root, _, files in os.walk(folder):

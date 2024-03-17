@@ -1,6 +1,7 @@
-import re
+import os
 import json
-from typing import List, Dict
+import pickle
+from typing import List, Dict, Optional
 from config.config import Config
 from FlagEmbedding import BGEM3FlagModel
 from src.chatbot.document_engine import Document
@@ -58,6 +59,11 @@ class LongTermMemory:
                         index="enable-bm25",
                     ),
                     Field(
+                        name="metadata",
+                        type="string",
+                        indexing=["summary", "attribute"],  # Adjust indexing as needed
+                    ),
+                    Field(
                         name="lexical_rep",
                         type="tensor<bfloat16>(t{})",
                         indexing=["summary", "attribute"],
@@ -106,7 +112,7 @@ class LongTermMemory:
                 ),
             ],
             first_phase=FirstPhaseRanking(
-                expression="0.6*dense + 0.2*lexical +  0.2*max_sim",
+                expression="0.4*dense + 0.2*lexical +  0.4*max_sim",
                 rank_score_drop_limit=0.0,
             ),
             match_features=["dense", "lexical", "max_sim", "bm25(text)"],
@@ -145,17 +151,35 @@ class LongTermMemory:
 
         if generate_embeddings:
             # Extract texts from documents for embedding generation
-            texts = [doc.text for doc in documents]
-            # Generate embeddings for the texts
-            embeddings = self._model.encode(
-                texts, return_dense=True, return_sparse=True, return_colbert_vecs=True
-            )
+            # TODO: REMOVE THIS
+            # Check if the embeddings file exists
+            embeddings_file = "embeddings.pkl"
+            if os.path.exists(embeddings_file):
+                # Load embeddings from the file
+                with open(embeddings_file, "rb") as f:
+                    embeddings = pickle.load(f)
+            else:
+                # Extract texts from documents for embedding generation
+                texts = [doc.text for doc in documents]
+
+                # Assume self._model is your embeddings model instance and it's already set up
+                embeddings = self._model.encode(
+                    texts,
+                    return_dense=True,
+                    return_sparse=True,
+                    return_colbert_vecs=True,
+                )
+
+                # Save the generated embeddings to a file for future use
+                with open(embeddings_file, "wb") as f:
+                    pickle.dump(embeddings, f)
 
         for i, document in enumerate(documents):
             # Initialize the fields dictionary, including embeddings if generated
             fields = {
                 "text": document.text,
                 "parent_id": document.parent_id if document.parent_id else "",
+                "metadata": json.dumps(document.metadata),
             }
 
             if generate_embeddings:
@@ -201,56 +225,32 @@ class LongTermMemory:
 
         for doc in documents:
             text = doc.text
-            paragraphs = text.split("\n\n")
-            chunks = []
+            current_pos = 0
+            text_length = len(text)
 
-            for paragraph in paragraphs:
-                if len(paragraph) <= chunk_size:
-                    chunks.append(paragraph)
+            while current_pos < text_length:
+                if current_pos + chunk_size >= text_length:
+                    # Last chunk may be smaller than chunk_size
+                    chunk = text[current_pos:text_length]
+                    current_pos = text_length
                 else:
-                    sentences = re.split(r"(?<=[.!?]) +", paragraph)
-                    sentence_chunk = ""
+                    end_pos = current_pos + chunk_size
+                    next_space = text.find(" ", end_pos - overlap)
+                    if next_space == -1 or next_space >= end_pos + overlap:
+                        # If there's no space in the overlap zone, or it's too far ahead, just cut directly
+                        next_space = end_pos
 
-                    for sentence in sentences:
-                        if len(sentence_chunk) + len(sentence) <= chunk_size:
-                            sentence_chunk += sentence + " "
-                        else:
-                            chunks.append(sentence_chunk.strip())
-                            # Start new chunk with an overlap from the previous chunk if it's long enough
-                            sentence_chunk = (
-                                ""
-                                if len(sentence) > overlap
-                                else sentence_chunk[-overlap:] + sentence + " "
-                            )
+                    chunk = text[current_pos:next_space].strip()
+                    current_pos = next_space
 
-                    if sentence_chunk:
-                        chunks.append(sentence_chunk.strip())
-
-            # If even sentences are too long, split by chunk size directly (last resort), including overlap
-            for chunk in chunks:
-                if len(chunk) <= chunk_size:
+                if chunk:
                     chunked_documents.append(
                         Document(parent_id=doc.id, text=chunk, metadata=doc.metadata)
                     )
-                else:
-                    # Adjust the loop to reduce the step size by the overlap amount to ensure the overlap
-                    for i in range(0, len(chunk), chunk_size - overlap):
-                        end_index = i + chunk_size
-                        # Ensure the chunk does not exceed the text length
-                        chunk_to_add = (
-                            chunk[i:end_index] if end_index <= len(chunk) else chunk[i:]
-                        )
-                        chunked_documents.append(
-                            Document(
-                                parent_id=doc.id,
-                                text=chunk_to_add,
-                                metadata=doc.metadata,
-                            )
-                        )
 
         return chunked_documents
 
-    def get_documents(self, query: str) -> List[Document]:
+    def get_documents(self, query: str, n_docs=5) -> List[Document]:
         """
         Retrieves documents relevant to a given query.
         The nearestNeighbor(embedding,q) function finds the documents in the
@@ -301,6 +301,36 @@ class LongTermMemory:
             body={**query_fields},
         )
         assert response.is_successful()
-        json_result = json.dumps(response.hits[0], indent=2)
-        print(json_result)
-        return [Document(id=hit["id"], text=hit["text"]) for hit in response.hits]
+
+        parent_ids = [hit["fields"]["parent_id"] for hit in response.hits[:n_docs]]
+        parent_documents = [
+            self._get_document_by_id(parent_id) for parent_id in parent_ids
+        ]
+
+        return parent_documents
+
+    def _get_document_by_id(self, data_id: str) -> Optional[Document]:
+        """
+        Gets a document from the database by its ID.
+
+        Args:
+            data_id (str): Unique ID associated with the document.
+
+        Returns:
+            Optional[Document]: Document associated with the given ID, or None if not found.
+        """
+        response = self._app.get_data(schema="RAGdb2", data_id=data_id)
+
+        if not response.is_successful():
+            print(f"Document with ID {data_id} not found")
+            return None
+
+        fields = response.json["fields"]
+        document = Document(
+            id=data_id,
+            parent_id="",
+            text=fields.get("text", ""),
+            metadata=fields.get("metadata", {}),
+        )
+
+        return document

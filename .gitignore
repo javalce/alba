@@ -1,0 +1,29 @@
+# macOS specific
+.DS_Store
+
+# Python-specific
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Poetry specific
+.poetry-env/
+poetry.lock
+
+# Virtual environment
+venv/
+.env
+
+# Project-specific directories
+data/
+logs/
+db/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Editors and IDEs
+.vscode/
+
+
+

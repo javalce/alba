@@ -30,7 +30,7 @@ class DocumentEngine:
             if header_start != -1
             else text.strip()
         )  # Default to full text if pattern not found
-        return Document(
+        doc = Document(
             parent_id=None,
             text=text,
             metadata={
@@ -40,6 +40,8 @@ class DocumentEngine:
                 "type": "standard",
             },
         )
+        doc.id = f"{decree_number}-{page_number}-{uuid.uuid4()}"
+        return doc
 
     def _parse_SEPEI_decree(
         self, text: str, page_number: int, decree_number: str, decree_date: str
@@ -56,7 +58,7 @@ class DocumentEngine:
             },
         )
 
-    def docs_from_decree_files(self, files: List[str]) -> List[Document]:
+    def _docs_from_decree_files(self, files: List[str]) -> List[Document]:
         documents = []
         decree_number_n_date_pattern = re.compile(
             r"Decreto Nº(\d+) de (\d{2}/\d{2}/\d{4})", re.DOTALL
@@ -90,12 +92,8 @@ class DocumentEngine:
 
         documents = []
         if files_type == "decrees":
-            # Extract info from each decree
-            decrees = self._decrees_from_files(files)
-
-            # All files of all types to be converted to the standard Document format;
-            # this will make it easy to ingest other types of documents in the future
-            documents = self._docs_from_decrees(decrees)
+            # Generate documents from decree files
+            documents = self._docs_from_decree_files(files)
         else:
             raise ValueError(f"Unsupported file type: {files_type}")
 

@@ -3,12 +3,12 @@
     "default_inference_model": "llama2",
     "embedding_model": "BAAI/bge-m3",
     "embedding_model_dim": 1024,
-    "db_name": "vector_db",
+    "db_name": "RAGdb2",
     "db_path": "chatbot/db",
     "raw_data_folder": "data/raw/",
     "processed_data_folder": "data/processed/",
     "embeddings_path": "data/embeddings/",
     "batch_size": 100,
-    "chunk_size": 250,
-    "chunk_overlap": 50  
+    "chunk_size": 1000,
+    "chunk_overlap": 100 
 }

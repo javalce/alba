@@ -12,6 +12,7 @@ pyvespa = "^0.39.0"
 ollama = "^0.1.7"
 flagembedding = "^1.2.5"
 pymupdf = "^1.23.26"
+pandas = "^2.2.1"
 
 
 [build-system]

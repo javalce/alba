@@ -1,9 +1,11 @@
 {
+    "run_mode": "BOTH",
     "model_api_url": "http://localhost:11434/api/generate",
     "default_inference_model": "llama2",
     "embedding_model": "BAAI/bge-m3",
     "embedding_model_dim": 1024,
     "db_name": "RAGdb2",
+    "schema_name": "RAGdb2",
     "db_path": "chatbot/db",
     "raw_data_folder": "data/raw/",
     "processed_data_folder": "data/processed/",

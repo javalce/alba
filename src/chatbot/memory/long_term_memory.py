@@ -5,13 +5,13 @@ from typing import List, Dict, Optional
 from config.config import Config
 from FlagEmbedding import BGEM3FlagModel
 from src.chatbot.document_engine import Document
+from vespa.application import Vespa
 from vespa.package import (
     ApplicationPackage,
     Field,
     FieldSet,
     Document as VespaDocument,
     Schema,
-    RankProfile,
     FirstPhaseRanking,
 )
 from vespa.deployment import VespaDocker
@@ -21,6 +21,8 @@ from vespa.package import RankProfile, Function, FirstPhaseRanking
 
 class LongTermMemory:
     def __init__(self):
+        self._db_name = Config.get("db_name")
+        self._schema = Config.get("schema_name")
         self._app = self._create_db_app()
         self._model = BGEM3FlagModel(Config.get("embedding_model"), use_fp16=False)
 
@@ -29,14 +31,19 @@ class LongTermMemory:
         Creates and deploys the Vespa application package for the database
         """
 
+        # Check if the Vespa application is already running
+        # If it is, return the existing app
+        app = Vespa(url="http://localhost:8080")
+        if isinstance(app, Vespa):
+            return app
+
         # Create Vespa schema and rank profile
         db_schema = self._create_schema()
         rank_profile = self._create_rank_profile()
         db_schema.add_rank_profile(rank_profile)
 
         # Create and deploy Vespa application package
-        db_name = Config.get("db_name")
-        db_app_package = ApplicationPackage(name=db_name, schema=[db_schema])
+        db_app_package = ApplicationPackage(name=self._schema, schema=[db_schema])
         db_container = VespaDocker()
 
         app = db_container.deploy(application_package=db_app_package)
@@ -47,7 +54,7 @@ class LongTermMemory:
         Returns a Vespa schema for the long-term memory database.
         """
         bge_m3_schema = Schema(
-            name=Config.get("db_name"),
+            name=self._schema,
             document=VespaDocument(
                 fields=[
                     Field(name="id", type="string", indexing=["summary"]),
@@ -119,6 +126,38 @@ class LongTermMemory:
         )
 
         return rank_profile
+
+    def _count_docs(self) -> int:
+        """
+        Counts the number of documents in the database.
+        """
+        # The YQL query to retrieve all document IDs from a specific schema
+        yql_query = f"select id from {self._schema} where true;"
+
+        # Perform the query and count the number of items returned
+        response = self._app.query(
+            yql=yql_query, query_model=None, type="all", body={"hits": 0}
+        )
+        number_of_documents = response.number_documents_indexed
+
+        print(f"Number of documents in the schema: {number_of_documents}")
+
+    def delete_documents(self, criteria: str) -> None:
+        """
+        Deletes documents from database.
+        """
+        # Execute the delete operation
+        if criteria == "all":
+            response = self._app.delete_all_docs(
+                content_cluster_name=self._db_name, schema=self._schema
+            )
+            # TODO: Implement logging system
+            print(response)
+        else:
+            if not isinstance(criteria, list):
+                criteria = [criteria]
+            for c in criteria:
+                self._app.delete_data(schema=self._schema, data_id=c)
 
     def add_documents(self, documents: List[Document]) -> None:
         """

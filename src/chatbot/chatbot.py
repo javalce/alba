@@ -12,7 +12,8 @@ class Chatbot:
         self.long_term_mem = LongTermMemory()
         self.short_term_mem = ShortTermMemory()
         self.resp_engine = ResponseEngine(model_name)
-        self.memorize_files(initial_files)
+        if initial_files:
+            self.memorize_info(initial_files)
 
     def recall_messages(self):
         return self.short_term_mem.recall_messages()
@@ -21,10 +22,13 @@ class Chatbot:
         self.short_term_mem.forget_messages()
 
     # Learn new facts from a document and store them in long-term memory
-    def memorize_files(self, files, type="decrees"):
+    def memorize_info(self, files, type="decrees"):
 
         documents = self.doc_engine.generate_documents(files, type)
         self.long_term_mem.add_documents(documents)
+
+    def forget_info(self, criteria):
+        self.long_term_mem.delete_documents(criteria)
 
     # Respond to user prompt
     def respond(self, user_prompt):
@@ -45,4 +49,5 @@ class Chatbot:
 
     def _create_query(self, prompt, recent_messages):
         # TODO: Implement this method
+        # Combine the user prompt with recent chat history to create a self-contained query
         return prompt

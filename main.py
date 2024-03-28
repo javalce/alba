@@ -46,14 +46,24 @@ def main():
 if __name__ == "__main__":
     # TODO: Move this back into main function and empty database
     # as part of the initialization in DEV mode
-    initial_files = []
-    folder = Config.get("raw_data_folder")
-    for root, _, files in os.walk(folder):
-        for file in files:
-            file_path = os.path.join(root, file)
-            initial_files.append(file_path)
+    # TODO: Add all embeddings/documents to the database
 
     model = Config.get("inference_model")
-    chatbot = Chatbot(model, initial_files)
-    chatbot.respond("¿Cómo se denomina la partida 610.9201.23300?")
-    main()
+    chatbot = Chatbot(model)
+
+    # BOTH: Clear the database and load all files into the database
+    # NONE: No files are embedded or loaded into the database
+    run_mode = Config.get("run_mode")
+
+    if run_mode == "BOTH":
+        initial_files = []
+        folder = Config.get("raw_data_folder")
+        for root, _, files in os.walk(folder):
+            for file in files:
+                file_path = os.path.join(root, file)
+                initial_files.append(file_path)
+                chatbot.forget_info("all")  # Clear the database
+                chatbot.long_term_mem._count_docs()
+                chatbot.memorize_info(initial_files)  # Load all files into the database
+    response = chatbot.respond("¿Cómo se denomina la partida 610.9201.23300?")
+    print(response)

@@ -15,11 +15,12 @@ class Document:
 
 class DocumentEngine:
     def _identify_decree_type(self, text: str) -> str:
-        if "SEPEI" in text:
+        if "servicio provincial de extinción de incendios" in text.lower():
             return "SEPEI"
         else:
             return "standard"  # Default to standard if none of the specific markers are found
 
+    # TODO: Add table and image parsing
     def _parse_standard_decree(
         self, text: str, page_number: int, decree_number: str, decree_date: str
     ) -> Document:
@@ -30,6 +31,7 @@ class DocumentEngine:
             if header_start != -1
             else text.strip()
         )  # Default to full text if pattern not found
+        # TODO: Add filename, decree type and keywords to metadata (link as well?)
         doc = Document(
             parent_id=None,
             text=text,

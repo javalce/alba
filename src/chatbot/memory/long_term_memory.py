@@ -1,352 +1,419 @@
 import os
 import json
 import pickle
-from typing import List, Dict, Optional
+import nltk
+from typing import List, Tuple, Optional
 from config.config import Config
-from FlagEmbedding import BGEM3FlagModel
 from src.chatbot.document_engine import Document
-from vespa.application import Vespa
-from vespa.package import (
-    ApplicationPackage,
-    Field,
-    FieldSet,
-    Document as VespaDocument,
-    Schema,
-    FirstPhaseRanking,
-)
-from vespa.deployment import VespaDocker
-from vespa.io import VespaResponse, VespaQueryResponse
-from vespa.package import RankProfile, Function, FirstPhaseRanking
+from pymilvus import connections
+from pymilvus import MilvusClient, DataType, Collection
+from pymilvus.client.abstract import AnnSearchRequest, WeightedRanker
+from milvus_model.hybrid import BGEM3EmbeddingFunction
+from milvus_model.sparse import BM25EmbeddingFunction
+from milvus_model.sparse.bm25.tokenizers import build_default_analyzer
+from pymilvus.orm.schema import CollectionSchema, FieldSchema
 
 
 class LongTermMemory:
     def __init__(self):
-        self._db_name = Config.get("db_name")
-        self._schema = Config.get("schema_name")
-        self._app = self._create_db_app()
-        self._model = BGEM3FlagModel(Config.get("embedding_model"), use_fp16=False)
+        # Establish a connection to the Milvus server
+        self.connect()
+        self._dense_ef = self._load_embedding_function("dense")
+        self._sparse_ef = self._load_embedding_function("sparse")
+        self._docs = self._create_docs_collection()
+        self._chunks = self._create_chunks_collection()
 
-    def _create_db_app(self):
+    def connect(self) -> MilvusClient:
         """
-        Creates and deploys the Vespa application package for the database
+        Connects to the Milvus server and returns the client object.
         """
+        # Establish a connection to the Milvus server
+        port = Config.get("MILVUS_PORT")
+        connections.connect("default", host=Config.get("MILVUS_HOST"), port=port)
 
-        # Check if the Vespa application is already running
-        # If it is, return the existing app
-        app = Vespa(url="http://localhost:8080")
-        if isinstance(app, Vespa):
-            return app
+        client = MilvusClient(uri=f"http://localhost:{port}")
+        collections = client.list_collections()
+        for collection_name in collections:
+            collection = Collection(name=collection_name)
+            collection.drop()
+            print(f"Dropped collection: {collection_name}")
 
-        # Create Vespa schema and rank profile
-        db_schema = self._create_schema()
-        rank_profile = self._create_rank_profile()
-        db_schema.add_rank_profile(rank_profile)
+    def _load_embedding_function(self, ef_type, corpus=None):
+        if ef_type == "sparse":
+            # More info here: https://milvus.io/docs/embed-with-bm25.md
+            # If a bm25 model already exists, load it. Otherwise, create a new one.
+            model_path = Config.get("sparse_embed_func_path")
+            if os.path.exists(model_path):
+                # Load the existing model
+                with open(model_path, "rb") as file:
+                    bm25_ef = pickle.load(file)
+            else:
+                if "stopwords" not in nltk.corpus.util.lazy_imports:
+                    nltk.download("stopwords")
 
-        # Create and deploy Vespa application package
-        db_app_package = ApplicationPackage(name=self._schema, schema=[db_schema])
-        db_container = VespaDocker()
+                analyzer = build_default_analyzer(language="sp")
+                bm25_ef = BM25EmbeddingFunction(analyzer)
 
-        app = db_container.deploy(application_package=db_app_package)
-        return app
+                # If a corpus is provided, fit the model to the corpus
+                if corpus:
+                    bm25_ef.fit(corpus)
+                    # Serialize and save the model to a file
+                    with open(model_path, "wb") as file:
+                        pickle.dump(bm25_ef, file)
 
-    def _create_schema(self):
-        """
-        Returns a Vespa schema for the long-term memory database.
-        """
-        bge_m3_schema = Schema(
-            name=self._schema,
-            document=VespaDocument(
-                fields=[
-                    Field(name="id", type="string", indexing=["summary"]),
-                    Field(name="parent_id", type="string", indexing=["summary"]),
-                    Field(
-                        name="text",
-                        type="string",
-                        indexing=["summary", "index"],
-                        index="enable-bm25",
-                    ),
-                    Field(
-                        name="metadata",
-                        type="string",
-                        indexing=["summary", "attribute"],  # Adjust indexing as needed
-                    ),
-                    Field(
-                        name="lexical_rep",
-                        type="tensor<bfloat16>(t{})",
-                        indexing=["summary", "attribute"],
-                    ),
-                    Field(
-                        name="dense_rep",
-                        type="tensor<bfloat16>(x[1024])",
-                        indexing=["summary", "attribute"],
-                        attribute=["distance-metric: angular"],
-                    ),
-                    Field(
-                        name="colbert_rep",
-                        type="tensor<bfloat16>(t{}, x[1024])",
-                        indexing=["summary", "attribute"],
-                    ),
-                ],
-            ),
-            fieldsets=[FieldSet(name="default", fields=["text"])],
+            return bm25_ef
+        elif ef_type == "dense":
+            # More info here: https://milvus.io/docs/embed-with-bgm-m3.md
+            bgeM3_ef = BGEM3EmbeddingFunction(
+                model_name="BAAI/bge-m3",  # Specify the model name
+                device="cpu",  # Specify the device to use, e.g., 'cpu' or 'cuda:0'
+                use_fp16=False,  # Specify whether to use fp16. Set to `False` if `device` is `cpu`.
+            )
+            return bgeM3_ef
+        else:
+            raise ValueError(f"Unsupported embedding function type: {ef_type}")
+
+    def _create_docs_collection(self):
+
+        schema = self._create_docs_schema()
+        docs_coll = Collection(name="docs", schema=schema)
+
+        return docs_coll
+
+    def _create_chunks_collection(self):
+
+        schema = self._create_chunks_schema()
+        chunks_coll = Collection(name="chunks", schema=schema)
+
+        bgeM3_index_params = {
+            "metric_type": "IP",  # Inner Product, assuming normalized vectors for cosine similarity
+            "index_type": "IVF_FLAT",
+            "params": {"nlist": 128},
+        }
+        bm25_index_params = {
+            "metric_type": "IP",  # Inner Product
+        }
+
+        chunks_coll.create_index(
+            field_name="dense_vector", index_params=bgeM3_index_params
         )
-        return bge_m3_schema
+        chunks_coll.create_index(
+            field_name="sparse_vector", index_params=bm25_index_params
+        )
+        return chunks_coll
 
-    def _create_rank_profile(self):
+    def _create_docs_schema(self) -> CollectionSchema:
         """
-        Creates a default rank profile (used to rank search results semantically)
+        Returns a schema for the long-term memory database of documents.
         """
-        rank_profile = RankProfile(
-            name="m3hybrid",
-            inputs=[
-                ("query(q_dense)", "tensor<bfloat16>(x[1024])"),
-                ("query(q_lexical)", "tensor<bfloat16>(t{})"),
-                ("query(q_colbert)", "tensor<bfloat16>(qt{}, x[1024])"),
-                ("query(q_len_colbert)", "float"),
+        schema = CollectionSchema(
+            [
+                FieldSchema(
+                    name="id",
+                    dtype=DataType.INT64,
+                    is_primary=True,
+                    auto_id=False,
+                ),
+                FieldSchema(name="page", dtype=DataType.INT64),
+                FieldSchema(name="date", dtype=DataType.VARCHAR, max_length=32),
+                FieldSchema(name="type", dtype=DataType.VARCHAR, max_length=32),
+                FieldSchema(name="number", dtype=DataType.INT64),
+                FieldSchema(
+                    name="text",
+                    dtype=DataType.VARCHAR,
+                    max_length=Config.get("doc_size"),
+                ),
+                # Add a dummy vector; Milvus requires at least one vector field in the schema
+                # This is not used, just a workaround to satisfy the schema requirements
+                FieldSchema(name="dummy_vector", dtype=DataType.FLOAT_VECTOR, dim=2),
             ],
-            functions=[
-                Function(
-                    name="dense",
-                    expression="cosine_similarity(query(q_dense), attribute(dense_rep),x)",
-                ),
-                Function(
-                    name="lexical",
-                    expression="sum(query(q_lexical) * attribute(lexical_rep))",
-                ),
-                Function(
-                    name="max_sim",
-                    expression="sum(reduce(sum(query(q_colbert) * attribute(colbert_rep) , x),max, t),qt)/query(q_len_colbert)",
-                ),
-            ],
-            first_phase=FirstPhaseRanking(
-                expression="0.4*dense + 0.2*lexical +  0.4*max_sim",
-                rank_score_drop_limit=0.0,
-            ),
-            match_features=["dense", "lexical", "max_sim", "bm25(text)"],
+            description="Collection for storing text and metadata of each document",
+            enable_auto_id=False,
         )
 
-        return rank_profile
+        return schema
+
+    def _create_chunks_schema(self) -> CollectionSchema:
+        """
+        Returns a schema for the long-term memory database of chunks.
+        """
+        schema = CollectionSchema(
+            [
+                FieldSchema(
+                    name="id",
+                    dtype=DataType.INT64,
+                    is_primary=True,
+                    auto_id=False,
+                ),
+                FieldSchema(
+                    name="dense_vector",
+                    dtype=DataType.FLOAT_VECTOR,
+                    dim=self._dense_ef.dim["colbert_vecs"],
+                ),
+                FieldSchema(
+                    name="sparse_vector",
+                    dtype=DataType.FLOAT_VECTOR,
+                    dim=self._sparse_ef.dim,
+                ),
+                FieldSchema(name="parent_id", dtype=DataType.INT64),
+                FieldSchema(
+                    name="text",
+                    dtype=DataType.VARCHAR,
+                    max_length=Config.get("chunk_size"),
+                ),
+            ],
+            description="Collection for storing chunk embeddings",
+            enable_auto_id=False,
+        )
+
+        return schema
 
     def _count_docs(self) -> int:
         """
         Counts the number of documents in the database.
         """
-        # The YQL query to retrieve all document IDs from a specific schema
-        yql_query = f"select id from {self._schema} where true;"
-
-        # Perform the query and count the number of items returned
-        response = self._app.query(
-            yql=yql_query, query_model=None, type="all", body={"hits": 0}
-        )
-        number_of_documents = response.number_documents_indexed
-
-        print(f"Number of documents in the schema: {number_of_documents}")
+        pass
 
     def delete_documents(self, criteria: str) -> None:
         """
         Deletes documents from database.
         """
-        # Execute the delete operation
-        if criteria == "all":
-            response = self._app.delete_all_docs(
-                content_cluster_name=self._db_name, schema=self._schema
-            )
-            # TODO: Implement logging system
-            print(response)
-        else:
-            if not isinstance(criteria, list):
-                criteria = [criteria]
-            for c in criteria:
-                self._app.delete_data(schema=self._schema, data_id=c)
+        pass
 
-    def add_documents(self, documents: List[Document]) -> None:
+    def add_documents(
+        self,
+        documents: List[Document],
+    ):
+        # Generate and insert document records
+        doc_records = self._generate_doc_records(documents)
+        # Transpose doc_records to match Milvus' expected input format for insert
+        transposed_doc_records = list(map(list, zip(*doc_records)))
+        self._docs.insert(transposed_doc_records)
+
+        # Generate chunks, their embeddings, and insert chunk records
+        chunks = self._chunk_documents(documents)
+        chunk_records = self._generate_chunk_records(chunks)
+        transposed_chunk_records = list(map(list, zip(*chunk_records)))
+        self._chunks.insert(transposed_chunk_records)
+
+    def _generate_doc_records(self, documents: List[Document]) -> List[List[any]]:
         """
-        Adds documents to the database, optionally generating embeddings for each document.
+        Prepare the records for inserting into the _docs collection.
+        """
+        records = []
+        for doc in documents:
+            record = [
+                int(
+                    doc.id
+                ),  # Assuming the ID is an integer or can be represented as one
+                doc.metadata.get("page", 0),
+                doc.metadata.get("date", ""),
+                doc.metadata.get("type", ""),
+                int(
+                    doc.metadata.get("number", 0)
+                ),  # Assuming number can be represented as int
+                doc.text[: Config.get("doc_size")],  # Truncate text if necessary
+                [0.0, 0.0],  # Dummy vector for the dummy_vector field
+            ]
+            records.append(record)
+        return records
+
+    def _generate_chunk_records(self, chunks: List[Document]) -> List[List[any]]:
+        """
+        Prepare the records for inserting into the _chunks collection,
+        including both dense and sparse embeddings.
+        """
+        records = []
+
+        # Extract chunk texts to generate embeddings
+        chunk_texts = [chunk.text for chunk in chunks]
+
+        # Generate dense embeddings using the BGE-M3 function
+        dense_embeddings = self._dense_ef.encode_documents(chunk_texts)["dense"]
+
+        # Generate sparse embeddings using the BM25 function
+        raw_sparse_embeddings = self._sparse_ef.encode_documents(chunk_texts)
+
+        # Convert sparse embeddings from csr_array format to a list for insertion
+        sparse_embeddings = [
+            sparse_embedding.toarray().tolist()
+            for sparse_embedding in raw_sparse_embeddings
+        ]
+
+        # Prepare records with both embeddings for each chunk
+        for i, chunk in enumerate(chunks):
+            # Prepare the record for the current chunk with the necessary fields
+            record = [
+                int(chunk.id),  # Convert chunk ID to integer if necessary
+                dense_embeddings[
+                    i
+                ].tolist(),  # Use the dense embedding and convert to list
+                sparse_embeddings[i],  # Use the converted sparse embedding
+                int(
+                    chunk.metadata.get("parent_id", 0)
+                ),  # Extract parent_id from metadata, convert to int
+                chunk.text[
+                    : Config.get("chunk_size")
+                ],  # Truncate text to specified chunk size if necessary
+            ]
+
+            # Append the prepared record to the list of records
+            records.append(record)
+
+        return records
+
+    def _insert_doc_records(self, doc_records: List[List[any]]) -> None:
+        """
+        Batch load document records into the _docs collection.
 
         Args:
-            documents (List[Document]): A list of documents to be processed and stored.
-            generate_embeddings (bool): A flag indicating whether embeddings should be generated for the documents.
+            doc_records: A list of document records to insert.
         """
+        # Transpose the doc_records list to match the structure expected by Milvus insert method.
+        field_values = list(zip(*doc_records))
 
-        # We first load the parent records, which contains all the text in each document
-        # The idea now in the data ingestion state is to first feed the parent records and
-        # then feed the chunk records. In the retrieval phase, we'll find the most relevant
-        # chunks and then retrieve their parent records, which are ultimately what will be
-        # used as context for the model to generate a response.
-        # Notice we don't need embeddings for the parent records
-        db_document_records = self._generate_records(
-            documents, generate_embeddings=False
-        )
-        self._load_records(db_document_records)
+        # Construct a dictionary where keys are field names and values are lists of field values.
+        data_to_insert = {
+            "id": field_values[0],
+            "page": field_values[1],
+            "date": field_values[2],
+            "type": field_values[3],
+            "number": field_values[4],
+            "text": field_values[5],
+        }
 
-        chunks = self._chunk_documents(documents)
-        db_chunk_records = self._generate_records(chunks, generate_embeddings=True)
-        self._load_records(db_chunk_records)
+        # Insert the formatted records into the _docs collection.
+        insert_result = self._docs.insert(data_to_insert)
+        print(f"Inserted {insert_result.insert_count} document records.")
 
-    def _generate_records(
-        self, documents: List[Document], generate_embeddings: bool
-    ) -> List[Dict]:
-        db_records = []
+    def _insert_chunk_records(self, chunk_records: List[List[any]]) -> None:
+        """
+        Batch load chunk records, including embeddings, into the _chunks collection.
 
-        if generate_embeddings:
-            # Extract texts from documents for embedding generation
-            # TODO: REMOVE THIS
-            # Check if the embeddings file exists
-            embeddings_file = "embeddings.pkl"
-            if os.path.exists(embeddings_file):
-                # Load embeddings from the file
-                with open(embeddings_file, "rb") as f:
-                    embeddings = pickle.load(f)
-            else:
-                # Extract texts from documents for embedding generation
-                texts = [doc.text for doc in documents]
+        Args:
+            chunk_records: A list of chunk records to insert, including embeddings.
+        """
+        # Transpose the chunk_records list to match the structure expected by Milvus insert method.
+        field_values = list(zip(*chunk_records))
 
-                # Assume self._model is your embeddings model instance and it's already set up
-                embeddings = self._model.encode(
-                    texts,
-                    return_dense=True,
-                    return_sparse=True,
-                    return_colbert_vecs=True,
-                )
+        # Construct a dictionary where keys are field names and values are lists of field values.
+        # Note: The sparse vector is expected to be already in a list format suitable for insertion.
+        data_to_insert = {
+            "id": field_values[0],
+            "dense_vector": field_values[1],
+            "sparse_vector": field_values[2],
+            "parent_id": field_values[3],
+            "text": field_values[4],
+        }
 
-                # Save the generated embeddings to a file for future use
-                with open(embeddings_file, "wb") as f:
-                    pickle.dump(embeddings, f)
+        # Insert the formatted records into the _chunks collection.
+        insert_result = self._chunks.insert(data_to_insert)
+        print(f"Inserted {insert_result.insert_count} chunk records.")
 
-        for i, document in enumerate(documents):
-            # Initialize the fields dictionary, including embeddings if generated
-            fields = {
-                "text": document.text,
-                "parent_id": document.parent_id if document.parent_id else "",
-                "metadata": json.dumps(document.metadata),
-            }
+    def _chunk_documents(self, documents: List[Document]) -> List[Document]:
+        # Define chunking parameters: size and overlap.
+        chunk_size = Config.get("chunk_size")
+        overlap = Config.get("chunk_overlap")
 
-            if generate_embeddings:
-                # Convert numpy arrays to lists before assigning them
-                fields["lexical_rep"] = {
-                    k: float(v) for k, v in embeddings["lexical_weights"][i].items()
-                }
-                fields["dense_rep"] = embeddings["dense_vecs"][i].tolist()
-                fields["colbert_rep"] = {
-                    str(j): vec.tolist()
-                    for j, vec in enumerate(embeddings["colbert_vecs"][i])
-                }
-
-            # Construct the record in the format expected by the database
-            record = {
-                "id": document.id,
-                "fields": fields,
-            }
-
-            db_records.append(record)
-
-        return db_records
-
-    def _load_records(self, records: List[Dict]) -> None:
-        # Define a callback function to handle the feed response for each document
-        def feed_callback(response: VespaResponse, id: str):
-            if response.status_code != 200:
-                print(f"Failed to feed document {id}: {response.json}")
-            else:
-                print(f"Document {id} successfully fed")
-
-        # Feed the iterable of processed embeddings to Vespa
-        self._app.feed_iterable(
-            iter=records,  # The iterable of documents to be fed
-            schema=Config.get("db_name"),  # The schema to feed the data into
-            callback=feed_callback,  # Optional: handle the outcome of each operation
-        )
-
-    def _chunk_documents(
-        self, documents: List[Document], chunk_size: int = 250, overlap: int = 50
-    ) -> List[Document]:
         chunked_documents = []
-
         for doc in documents:
             text = doc.text
-            current_pos = 0
-            text_length = len(text)
+            current_pos = 0  # Start position for chunking.
 
+            text_length = len(text)
+            chunk_counter = 1  # Initialize chunk counter for each document.
             while current_pos < text_length:
                 if current_pos + chunk_size >= text_length:
-                    # Last chunk may be smaller than chunk_size
                     chunk = text[current_pos:text_length]
                     current_pos = text_length
                 else:
                     end_pos = current_pos + chunk_size
                     next_space = text.find(" ", end_pos - overlap)
                     if next_space == -1 or next_space >= end_pos + overlap:
-                        # If there's no space in the overlap zone, or it's too far ahead, just cut directly
                         next_space = end_pos
 
                     chunk = text[current_pos:next_space].strip()
                     current_pos = next_space
 
                 if chunk:
+                    metadata = {
+                        "parent_id": doc.id,
+                        "chunk_id": f"{doc.id}_chunk_{chunk_counter}",  # Unique chunk identifier.
+                    }
                     chunked_documents.append(
-                        Document(parent_id=doc.id, text=chunk, metadata=doc.metadata)
+                        Document(id=metadata["chunk_id"], text=chunk, metadata=metadata)
                     )
+                    chunk_counter += 1
 
         return chunked_documents
 
-    def get_documents(self, query: str, n_docs=5) -> List[Document]:
+    def get_context(self, query: str, n_docs=2) -> List[Document]:
         """
-        Retrieves documents relevant to a given query.
-        The nearestNeighbor(embedding,q) function finds the documents in the
-        RAGdb database that are nearest to the query embedding vector q. The
-        targetHits:n instructs the database to find the n closest documents
-        according to the embedding distance and then rank them using the specified
-        rank-profile fusion. After the nearest neighbor search is complete, the rank
-        function further processes these documents according to the fusion ranking profile,
-        which could include additional relevancy computations like BM25 scores or
-        other rank features.
-
-        Finally, limit 5 tells Vespa that of these ranked results, only the top 5
-        should be returned in the response.
-
+        Retrieves relevant documents from the database based on a query.
         Args:
             query (str): Input query.
 
         Returns:
             List[Document]: List of relevant documents.
         """
+        # Step 1: Generate embeddings for the query
+        dense_query_embedding = self.bge_m3_ef.encode_queries([query])["dense"]
+        raw_sparse_embeddings = self.bm25_ef.encode_queries([query])
 
+        # Convert sparse embeddings from csr_matrix to a list for easier manipulation
+        sparse_embeddings = raw_sparse_embeddings.toarray().tolist()
+
+        # Step 2: Create AnnSearchRequest for dense embeddings
+        dense_search_request = AnnSearchRequest(
+            data=dense_query_embedding,
+            anns_field="dense_vector",
+            param={"metric_type": "IP", "params": {"nprobe": 10}},
+            limit=10,
+        )
+
+        # Step 3: Create AnnSearchRequest for sparse embeddings
+        sparse_search_request = AnnSearchRequest(
+            data=sparse_embeddings,
+            anns_field="sparse_vector",
+            param={"metric_type": "IP", "params": {"nprobe": 10}},
+            limit=10,
+        )
+
+        # Step 4: Perform a hybrid search
+        response = self._chunks.hybrid_search(
+            reqs=[dense_search_request, sparse_search_request],
+            rerank=WeightedRanker(0.5, 0.5),  # Adjust weights as needed
+            limit=10,
+        )
         # The M3 colbert scoring function needs the query length to normalize the score to the range 0 to 1.
         # This helps when combining the score with the other scoring functions.
-        query_embeddings = self._model.encode(
-            [query], return_dense=True, return_sparse=True, return_colbert_vecs=True
-        )
-        query_length = query_embeddings["colbert_vecs"][0].shape[0]
-        # TODO: Create a method to generate these fields
-        query_fields = {
-            "input.query(q_lexical)": {
-                key: float(value)
-                for key, value in query_embeddings["lexical_weights"][0].items()
-            },
-            "input.query(q_dense)": query_embeddings["dense_vecs"][0].tolist(),
-            "input.query(q_colbert)": str(
-                {
-                    index: query_embeddings["colbert_vecs"][0][index].tolist()
-                    for index in range(query_embeddings["colbert_vecs"][0].shape[0])
-                }
-            ),
-            "input.query(q_len_colbert)": query_length,
-        }
+        query_embeddings = self._dense_ef.encode_queries([query])
 
-        response: VespaQueryResponse = self._app.query(
-            yql="select id, parent_id, text from RAGdb2 where userQuery() or ({targetHits:100}nearestNeighbor(dense_rep,q_dense))",
-            ranking="m3hybrid",
-            query=query[0],
-            body={**query_fields},
-        )
-        assert response.is_successful()
+        # TODO: Implement the query to retrieve relevant documents
 
-        parent_ids = [hit["fields"]["parent_id"] for hit in response.hits[:n_docs]]
+        # Retrieve n_docs unique parent IDs from the response
+        all_parent_ids = [hit["fields"]["parent_id"] for hit in response.hits]
+        unique_parent_ids = []
+        for id in all_parent_ids:
+            if id not in unique_parent_ids:
+                unique_parent_ids.append(id)
+                if len(unique_parent_ids) == n_docs:
+                    break
+
         parent_documents = [
-            self._get_document_by_id(parent_id) for parent_id in parent_ids
+            self._get_document_by_id(parent_id) for parent_id in unique_parent_ids
         ]
 
-        return parent_documents
+        context = ""
+        for doc in parent_documents:
+            # Extract decree number from metadata
+            metadata = json.loads(doc.metadata)
+            doc_number = metadata["number"]
+            # Crear header for each document
+            header = f"###DECRETO {doc_number}###\n"
+            # Add the text of the document to the context
+            context += f"{header}{doc.text}\n\n"
+        return context
 
     def _get_document_by_id(self, data_id: str) -> Optional[Document]:
         """

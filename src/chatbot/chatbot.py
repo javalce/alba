@@ -39,7 +39,7 @@ class Chatbot:
         query = self._create_query(user_prompt, recent_messages)
 
         # Enrich the query with relevant facts from long-term memory
-        context = self.long_term_mem.get_documents(query)
+        context = self.long_term_mem.get_context(query)
         llm_prompt = TemplateManager.get("llm_prompt", query=query, context=context)
 
         response = self.resp_engine.generate_response(llm_prompt)

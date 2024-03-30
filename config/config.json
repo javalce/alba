@@ -1,16 +1,19 @@
 {
     "run_mode": "BOTH",
+    "db_url": "http://localhost:19530",
     "model_api_url": "http://localhost:11434/api/generate",
     "default_inference_model": "llama2",
-    "embedding_model": "BAAI/bge-m3",
-    "embedding_model_dim": 1024,
-    "db_name": "RAGdb2",
-    "schema_name": "RAGdb2",
+    "dense_embed_func_dim": 1024,
+    "sparse_embed_func_path": "models/bm25_model.pkl",
+    "db_collection": "rag",
     "db_path": "chatbot/db",
+    "MILVUS_HOST": "127.0.0.1",
+    "MILVUS_PORT": "19530",
     "raw_data_folder": "data/raw/",
     "processed_data_folder": "data/processed/",
     "embeddings_path": "data/embeddings/",
     "batch_size": 100,
-    "chunk_size": 1000,
-    "chunk_overlap": 100 
+    "doc_size": 8192,
+    "chunk_size": 512,
+    "chunk_overlap": 128
 }

@@ -7,8 +7,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class Document:
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    parent_id: str = None
+    id: str
     text: str = ""
     metadata: dict = field(default_factory=dict)
 
@@ -33,32 +32,34 @@ class DocumentEngine:
         )  # Default to full text if pattern not found
         # TODO: Add filename, decree type and keywords to metadata (link as well?)
         doc = Document(
-            parent_id=None,
+            id=f"{decree_number}_{page_number}",
             text=text,
             metadata={
                 "page": page_number,
-                "number": decree_number,
                 "date": decree_date,
                 "type": "standard",
+                "number": decree_number,
             },
         )
-        doc.id = f"{decree_number}-{page_number}-{uuid.uuid4()}"
+
         return doc
 
     def _parse_SEPEI_decree(
         self, text: str, page_number: int, decree_number: str, decree_date: str
     ) -> Document:
         # TODO: Implement specific parsing logic for SEPEI decrees here
-        return Document(
-            parent_id=None,
+        doc = Document(
+            id=f"{decree_number}_{page_number}",
             text=text.strip(),
             metadata={
                 "page": page_number,
-                "number": decree_number,
                 "date": decree_date,
                 "type": "SEPEI",
+                "number": decree_number,
             },
         )
+
+        return doc
 
     def _docs_from_decree_files(self, files: List[str]) -> List[Document]:
         documents = []
@@ -70,7 +71,8 @@ class DocumentEngine:
             pdf = fitz.open(file_path)
 
             for page_num in range(len(pdf)):
-                text = pdf[page_num].get_text("text")
+                raw_text = pdf[page_num].get_text("text")
+                text = self._clean_text(raw_text)
 
                 number_n_date = decree_number_n_date_pattern.search(text)
                 number = number_n_date.group(1) if number_n_date else None
@@ -100,3 +102,20 @@ class DocumentEngine:
             raise ValueError(f"Unsupported file type: {files_type}")
 
         return documents
+
+    def _clean_text(self, text: str) -> str:
+        # Use a temporary placeholder for "\n\n"
+        placeholder = (
+            "\ue000"  # Using a Private Use Area Unicode character as a placeholder
+        )
+
+        # First, replace "\n \n" with the placeholder
+        text = text.replace("\n\n", placeholder)
+        text = text.replace("\n \n", placeholder)
+
+        # Then, replace remaining "\n" with a single space
+        text = text.replace("\n", " ")
+
+        # Finally, replace the placeholder with "\n\n"
+        text = text.replace(placeholder, "\n\n")
+        return text

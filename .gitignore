@@ -18,6 +18,7 @@ venv/
 data/
 logs/
 db/
+models/
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -29,5 +30,5 @@ db/
 *.pkl
 *.csv
 *.blob
-
+*temp.py
 

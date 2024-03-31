@@ -2,6 +2,7 @@ import os
 import json
 import pickle
 import nltk
+import logging
 from typing import List, Tuple, Optional
 from config.config import Config
 from src.chatbot.document_engine import Document
@@ -13,30 +14,31 @@ from milvus_model.sparse import BM25EmbeddingFunction
 from milvus_model.sparse.bm25.tokenizers import build_default_analyzer
 from pymilvus.orm.schema import CollectionSchema, FieldSchema
 
+# Set up basic configuration for logging
+logging.basicConfig(
+    filename=Config.get("log_path"),
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+
 
 class LongTermMemory:
     def __init__(self):
         # Establish a connection to the Milvus server
-        self.connect()
+        self._client = self._connect()
+
         self._dense_ef = self._load_embedding_function("dense")
         self._sparse_ef = self._load_embedding_function("sparse")
-        self._docs = self._create_docs_collection()
-        self._chunks = self._create_chunks_collection()
 
-    def connect(self) -> MilvusClient:
-        """
-        Connects to the Milvus server and returns the client object.
-        """
-        # Establish a connection to the Milvus server
+        self._docs = self._load_docs_collection()
+        self._chunks = self._load_chunks_collection()
+
+    def _connect(self):
+        host = Config.get("MILVUS_HOST")
         port = Config.get("MILVUS_PORT")
-        connections.connect("default", host=Config.get("MILVUS_HOST"), port=port)
-
-        client = MilvusClient(uri=f"http://localhost:{port}")
-        collections = client.list_collections()
-        for collection_name in collections:
-            collection = Collection(name=collection_name)
-            collection.drop()
-            print(f"Dropped collection: {collection_name}")
+        connections.connect(host=host, port=port)
+        client = MilvusClient(host=host, port=port)
+        return client
 
     def _load_embedding_function(self, ef_type, corpus=None):
         if ef_type == "sparse":
@@ -73,34 +75,66 @@ class LongTermMemory:
         else:
             raise ValueError(f"Unsupported embedding function type: {ef_type}")
 
-    def _create_docs_collection(self):
+    def _load_docs_collection(self):
+        if not self._client.has_collection("docs"):
+            schema = self._create_docs_schema()
+            self._client.create_collection(collection_name="docs", schema=schema)
 
-        schema = self._create_docs_schema()
-        docs_coll = Collection(name="docs", schema=schema)
+            # Adjusted index_params structure to be a list containing one dictionary
+            index_params = [
+                {
+                    "field_name": "docs_vector",
+                    "params": {
+                        "metric_type": "L2",
+                        # Assuming you want to use an IVF_FLAT index as an example
+                        "index_type": "IVF_FLAT",
+                        "params": {
+                            "nlist": 128
+                        },  # Example specific parameter for IVF_FLAT
+                    },
+                }
+            ]
 
-        return docs_coll
+            self._client.create_index(
+                collection_name="docs",
+                index_params=index_params,  # Now passing a list of dictionaries
+            )
 
-    def _create_chunks_collection(self):
+        self._client.load_collection("docs")
+        return Collection(name="docs")
 
-        schema = self._create_chunks_schema()
-        chunks_coll = Collection(name="chunks", schema=schema)
+    def _load_chunks_collection(self):
+        if not self._client.has_collection("chunks"):
+            schema = self._create_chunks_schema()
+            self._client.create_collection(collection_name="chunks", schema=schema)
 
-        bgeM3_index_params = {
-            "metric_type": "IP",  # Inner Product, assuming normalized vectors for cosine similarity
-            "index_type": "IVF_FLAT",
-            "params": {"nlist": 128},
-        }
-        bm25_index_params = {
-            "metric_type": "IP",  # Inner Product
-        }
+        # Define index parameters for both fields as a list of dictionaries
+        index_params = [
+            {
+                "field_name": "dense_vector",
+                "params": {
+                    "metric_type": "IP",  # Inner Product, assuming normalized vectors for cosine similarity
+                    "index_type": "IVF_FLAT",
+                    "params": {"nlist": 128},
+                },
+            },
+            {
+                "field_name": "sparse_vector",
+                "params": {
+                    "metric_type": "IP",  # Inner Product
+                    # Assuming default index_type and other parameters if needed
+                },
+            },
+        ]
 
-        chunks_coll.create_index(
-            field_name="dense_vector", index_params=bgeM3_index_params
+        # Create indexes on the specified fields
+        self._client.create_index(
+            collection_name="chunks",
+            index_params=index_params,  # Pass the list of dictionaries as index_params
         )
-        chunks_coll.create_index(
-            field_name="sparse_vector", index_params=bm25_index_params
-        )
-        return chunks_coll
+
+        self._client.load_collection("chunks")
+        return Collection(name="chunks")
 
     def _create_docs_schema(self) -> CollectionSchema:
         """
@@ -110,7 +144,8 @@ class LongTermMemory:
             [
                 FieldSchema(
                     name="id",
-                    dtype=DataType.INT64,
+                    dtype=DataType.VARCHAR,
+                    max_length=32,
                     is_primary=True,
                     auto_id=False,
                 ),
@@ -123,9 +158,9 @@ class LongTermMemory:
                     dtype=DataType.VARCHAR,
                     max_length=Config.get("doc_size"),
                 ),
-                # Add a dummy vector; Milvus requires at least one vector field in the schema
+                # Add a docs vector; Milvus requires at least one vector field in the schema
                 # This is not used, just a workaround to satisfy the schema requirements
-                FieldSchema(name="dummy_vector", dtype=DataType.FLOAT_VECTOR, dim=2),
+                FieldSchema(name="docs_vector", dtype=DataType.FLOAT_VECTOR, dim=2),
             ],
             description="Collection for storing text and metadata of each document",
             enable_auto_id=False,
@@ -141,7 +176,8 @@ class LongTermMemory:
             [
                 FieldSchema(
                     name="id",
-                    dtype=DataType.INT64,
+                    dtype=DataType.VARCHAR,
+                    max_length=32,
                     is_primary=True,
                     auto_id=False,
                 ),
@@ -155,11 +191,15 @@ class LongTermMemory:
                     dtype=DataType.FLOAT_VECTOR,
                     dim=self._sparse_ef.dim,
                 ),
-                FieldSchema(name="parent_id", dtype=DataType.INT64),
+                FieldSchema(
+                    name="parent_id",
+                    dtype=DataType.VARCHAR,
+                    max_length=32,
+                ),
                 FieldSchema(
                     name="text",
                     dtype=DataType.VARCHAR,
-                    max_length=Config.get("chunk_size"),
+                    max_length=Config.get("chunk_size") + Config.get("chunk_overlap"),
                 ),
             ],
             description="Collection for storing chunk embeddings",
@@ -174,11 +214,16 @@ class LongTermMemory:
         """
         pass
 
-    def delete_documents(self, criteria: str) -> None:
+    def delete_documents(self, collection: str) -> None:
         """
         Deletes documents from database.
         """
-        pass
+        if collection == "all":
+            collections = self._client.list_collections()
+            for collection_name in collections:
+                self._client.drop_collection(collection_name)
+        else:
+            self._client.drop_collection(collection)
 
     def add_documents(
         self,
@@ -186,15 +231,14 @@ class LongTermMemory:
     ):
         # Generate and insert document records
         doc_records = self._generate_doc_records(documents)
-        # Transpose doc_records to match Milvus' expected input format for insert
-        transposed_doc_records = list(map(list, zip(*doc_records)))
-        self._docs.insert(transposed_doc_records)
+
+        self._docs.insert(doc_records)
 
         # Generate chunks, their embeddings, and insert chunk records
         chunks = self._chunk_documents(documents)
         chunk_records = self._generate_chunk_records(chunks)
-        transposed_chunk_records = list(map(list, zip(*chunk_records)))
-        self._chunks.insert(transposed_chunk_records)
+
+        self._chunks.insert(chunk_records)
 
     def _generate_doc_records(self, documents: List[Document]) -> List[List[any]]:
         """
@@ -203,9 +247,7 @@ class LongTermMemory:
         records = []
         for doc in documents:
             record = [
-                int(
-                    doc.id
-                ),  # Assuming the ID is an integer or can be represented as one
+                doc.id,  # Assuming the ID is an integer or can be represented as one
                 doc.metadata.get("page", 0),
                 doc.metadata.get("date", ""),
                 doc.metadata.get("type", ""),
@@ -213,10 +255,13 @@ class LongTermMemory:
                     doc.metadata.get("number", 0)
                 ),  # Assuming number can be represented as int
                 doc.text[: Config.get("doc_size")],  # Truncate text if necessary
-                [0.0, 0.0],  # Dummy vector for the dummy_vector field
+                [0.0, 0.0],  # Dummy vector for the docs_vector field
             ]
             records.append(record)
-        return records
+
+        # Transpose doc_records to match Milvus' expected input format for insert
+        transposed_records = list(map(list, zip(*records)))
+        return transposed_records
 
     def _generate_chunk_records(self, chunks: List[Document]) -> List[List[any]]:
         """
@@ -227,6 +272,11 @@ class LongTermMemory:
 
         # Extract chunk texts to generate embeddings
         chunk_texts = [chunk.text for chunk in chunks]
+        for chunk in chunks:
+            if len(chunk.text) == 0:
+                print(f"Empty chunk text for document ID: {chunk.id}")
+            elif len(chunk.text) > Config.get("chunk_size"):
+                print(f"Chunk text exceeds maximum size for document ID: {chunk.id}")
 
         # Generate dense embeddings using the BGE-M3 function
         dense_embeddings = self._dense_ef.encode_documents(chunk_texts)["dense"]
@@ -244,14 +294,12 @@ class LongTermMemory:
         for i, chunk in enumerate(chunks):
             # Prepare the record for the current chunk with the necessary fields
             record = [
-                int(chunk.id),  # Convert chunk ID to integer if necessary
+                chunk.id,
                 dense_embeddings[
                     i
                 ].tolist(),  # Use the dense embedding and convert to list
-                sparse_embeddings[i],  # Use the converted sparse embedding
-                int(
-                    chunk.metadata.get("parent_id", 0)
-                ),  # Extract parent_id from metadata, convert to int
+                sparse_embeddings[i][0],  # Use the converted sparse embedding
+                chunk.metadata.get("parent_id", 0),  # Extract parent_id from metadata
                 chunk.text[
                     : Config.get("chunk_size")
                 ],  # Truncate text to specified chunk size if necessary
@@ -260,7 +308,8 @@ class LongTermMemory:
             # Append the prepared record to the list of records
             records.append(record)
 
-        return records
+        transposed_records = list(map(list, zip(*records)))
+        return transposed_records
 
     def _insert_doc_records(self, doc_records: List[List[any]]) -> None:
         """
@@ -286,18 +335,11 @@ class LongTermMemory:
         insert_result = self._docs.insert(data_to_insert)
         print(f"Inserted {insert_result.insert_count} document records.")
 
-    def _insert_chunk_records(self, chunk_records: List[List[any]]) -> None:
+    def _insert_chunk_records(self, chunk_records):
         """
         Batch load chunk records, including embeddings, into the _chunks collection.
-
-        Args:
-            chunk_records: A list of chunk records to insert, including embeddings.
         """
-        # Transpose the chunk_records list to match the structure expected by Milvus insert method.
         field_values = list(zip(*chunk_records))
-
-        # Construct a dictionary where keys are field names and values are lists of field values.
-        # Note: The sparse vector is expected to be already in a list format suitable for insertion.
         data_to_insert = {
             "id": field_values[0],
             "dense_vector": field_values[1],
@@ -306,22 +348,21 @@ class LongTermMemory:
             "text": field_values[4],
         }
 
-        # Insert the formatted records into the _chunks collection.
         insert_result = self._chunks.insert(data_to_insert)
-        print(f"Inserted {insert_result.insert_count} chunk records.")
+        logging.info(f"Inserted {insert_result.insert_count} chunk records.")
 
-    def _chunk_documents(self, documents: List[Document]) -> List[Document]:
-        # Define chunking parameters: size and overlap.
+    def _chunk_documents(self, documents):
         chunk_size = Config.get("chunk_size")
         overlap = Config.get("chunk_overlap")
 
         chunked_documents = []
         for doc in documents:
             text = doc.text
-            current_pos = 0  # Start position for chunking.
-
+            current_pos = 0
             text_length = len(text)
-            chunk_counter = 1  # Initialize chunk counter for each document.
+            logging.info(f"Document ID {doc.id}: Length {text_length}")
+
+            chunk_counter = 1
             while current_pos < text_length:
                 if current_pos + chunk_size >= text_length:
                     chunk = text[current_pos:text_length]
@@ -331,17 +372,19 @@ class LongTermMemory:
                     next_space = text.find(" ", end_pos - overlap)
                     if next_space == -1 or next_space >= end_pos + overlap:
                         next_space = end_pos
-
                     chunk = text[current_pos:next_space].strip()
                     current_pos = next_space
 
                 if chunk:
-                    metadata = {
-                        "parent_id": doc.id,
-                        "chunk_id": f"{doc.id}_chunk_{chunk_counter}",  # Unique chunk identifier.
-                    }
+                    logging.info(
+                        f"Document ID {doc.id}: Chunk {chunk_counter} Length {len(chunk)}"
+                    )
                     chunked_documents.append(
-                        Document(id=metadata["chunk_id"], text=chunk, metadata=metadata)
+                        Document(
+                            id=f"{doc.id}_{chunk_counter}",
+                            text=chunk,
+                            metadata={"parent_id": doc.id},
+                        )
                     )
                     chunk_counter += 1
 
@@ -356,41 +399,69 @@ class LongTermMemory:
         Returns:
             List[Document]: List of relevant documents.
         """
-        # Step 1: Generate embeddings for the query
-        dense_query_embedding = self.bge_m3_ef.encode_queries([query])["dense"]
-        raw_sparse_embeddings = self.bm25_ef.encode_queries([query])
+        n_results = 10
+        results = self._search_documents(query, n_results)
+        documents = self._retrieve_documents(results, n_docs)
+        context = self._format_context(documents)
 
-        # Convert sparse embeddings from csr_matrix to a list for easier manipulation
-        sparse_embeddings = raw_sparse_embeddings.toarray().tolist()
+        return context
 
-        # Step 2: Create AnnSearchRequest for dense embeddings
+    def _search_documents(self, query: str, n_results: int) -> List[AnnSearchRequest]:
+        """
+        Retrieves relevant context from the database based on a query.
+
+        Args:
+            query (str): Input query string.
+            n_docs (int): Number of documents to retrieve context for.
+
+        Returns:
+            The context as a string, aggregated from relevant documents.
+        """
+        # Step 1: Generate Query Embeddings
+        # Generate dense embedding for the query
+        raw_query_dense_embeddings = self._dense_ef.encode_queries([query])
+        dense_query_embedding = [raw_query_dense_embeddings["dense"][0].tolist()]
+
+        # Generate sparse embedding for the query
+        raw_query_sparse_embeddings = self._sparse_ef.encode_queries(
+            [query]
+        )  # Assume returns a list of embeddings
+        sparse_query_embedding = raw_query_sparse_embeddings.toarray().tolist()
+
+        # Step 2: Create Search Requests
+        # AnnSearchRequest for dense embeddings
         dense_search_request = AnnSearchRequest(
             data=dense_query_embedding,
             anns_field="dense_vector",
             param={"metric_type": "IP", "params": {"nprobe": 10}},
-            limit=10,
+            limit=n_results,
         )
 
-        # Step 3: Create AnnSearchRequest for sparse embeddings
+        # AnnSearchRequest for sparse embeddings
         sparse_search_request = AnnSearchRequest(
-            data=sparse_embeddings,
+            data=sparse_query_embedding,
             anns_field="sparse_vector",
             param={"metric_type": "IP", "params": {"nprobe": 10}},
-            limit=10,
+            limit=n_results,
         )
 
-        # Step 4: Perform a hybrid search
+        # Step 3: Perform Hybrid Search
+        # Execute hybrid_search using the prepared search requests and a reranking strategy
         response = self._chunks.hybrid_search(
-            reqs=[dense_search_request, sparse_search_request],
-            rerank=WeightedRanker(0.5, 0.5),  # Adjust weights as needed
-            limit=10,
+            reqs=[
+                dense_search_request,
+                sparse_search_request,
+            ],  # List of search requests
+            rerank=WeightedRanker(0.5, 0.5),  # Reranking strategy
+            output_fields=["parent_id"],
+            limit=n_results,
         )
-        # The M3 colbert scoring function needs the query length to normalize the score to the range 0 to 1.
-        # This helps when combining the score with the other scoring functions.
-        query_embeddings = self._dense_ef.encode_queries([query])
 
-        # TODO: Implement the query to retrieve relevant documents
+        return response
 
+    def _retrieve_documents(
+        self, response: List[AnnSearchRequest], n_docs: int
+    ) -> List[Document]:
         # Retrieve n_docs unique parent IDs from the response
         all_parent_ids = [hit["fields"]["parent_id"] for hit in response.hits]
         unique_parent_ids = []
@@ -400,12 +471,15 @@ class LongTermMemory:
                 if len(unique_parent_ids) == n_docs:
                     break
 
-        parent_documents = [
+        documents = [
             self._get_document_by_id(parent_id) for parent_id in unique_parent_ids
         ]
 
+        return documents
+
+    def _format_context(self, documents: List[Document]) -> str:
         context = ""
-        for doc in parent_documents:
+        for doc in documents:
             # Extract decree number from metadata
             metadata = json.loads(doc.metadata)
             doc_number = metadata["number"]

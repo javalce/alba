@@ -27,8 +27,8 @@ class Chatbot:
         documents = self.doc_engine.generate_documents(files, type)
         self.long_term_mem.add_documents(documents)
 
-    def forget_info(self, criteria):
-        self.long_term_mem.delete_documents(criteria)
+    def forget_info(self, collections):
+        self.long_term_mem.delete_documents(collections)
 
     # Respond to user prompt
     def respond(self, user_prompt):

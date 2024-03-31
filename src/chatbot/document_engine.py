@@ -21,16 +21,25 @@ class DocumentEngine:
 
     # TODO: Add table and image parsing
     def _parse_standard_decree(
-        self, text: str, page_number: int, decree_number: str, decree_date: str
+        self,
+        text: str,
+        page_number: int,
+        decree_number: str,
+        decree_date: str,
+        multi_page_decree: bool,
     ) -> Document:
-        text_start = text.find("OBJETO:")
+        if multi_page_decree:
+            text_start = 0  # Start from the beginning of the text
+        else:
+            text_start = text.find("OBJETO:")
+
         header_start = text.find("Decreto Nº")
         text = (
             text[text_start:header_start].strip()
             if header_start != -1
             else text.strip()
-        )  # Default to full text if pattern not found
-        # TODO: Add filename, decree type and keywords to metadata (link as well?)
+        )
+
         doc = Document(
             id=f"{decree_number}_{page_number}",
             text=text,
@@ -41,9 +50,9 @@ class DocumentEngine:
                 "number": decree_number,
             },
         )
-
         return doc
 
+    # TODO: Refine parsing and prepare for multipage decrees
     def _parse_SEPEI_decree(
         self, text: str, page_number: int, decree_number: str, decree_date: str
     ) -> Document:
@@ -66,10 +75,10 @@ class DocumentEngine:
         decree_number_n_date_pattern = re.compile(
             r"Decreto Nº(\d+) de (\d{2}/\d{2}/\d{4})", re.DOTALL
         )
+        previous_decree_number = None  # Track the decree number across pages
 
         for file_path in files:
             pdf = fitz.open(file_path)
-
             for page_num in range(len(pdf)):
                 raw_text = pdf[page_num].get_text("text")
                 text = self._clean_text(raw_text)
@@ -78,13 +87,19 @@ class DocumentEngine:
                 number = number_n_date.group(1) if number_n_date else None
                 date = number_n_date.group(2) if number_n_date else None
 
+                # Determine if this page continues the previous decree
+                multi_page_decree = number == previous_decree_number
+
                 decree_type = self._identify_decree_type(text)
                 if decree_type == "standard":
-                    doc = self._parse_standard_decree(text, page_num + 1, number, date)
+                    doc = self._parse_standard_decree(
+                        text, page_num + 1, number, date, multi_page_decree
+                    )
                 elif decree_type == "SEPEI":
                     doc = self._parse_SEPEI_decree(text, page_num + 1, number, date)
 
                 documents.append(doc)
+                previous_decree_number = number  # Update the previous decree number
 
             pdf.close()
         return documents

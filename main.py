@@ -62,11 +62,9 @@ if __name__ == "__main__":
             for file in files:
                 file_path = os.path.join(root, file)
                 initial_files.append(file_path)
-                # chatbot.forget_info("all")  # Clear the database
-                # chatbot.long_term_mem._count_docs()
-            docs = chatbot.doc_engine.generate_documents(initial_files, "decrees")
-            chatbot.memorize_info(initial_files)  # Load all files into the database
-            # chatbot.long_term_mem._count_docs()
+        chatbot.forget_info("all")  # Clear the database
+        chatbot.memorize_info(initial_files)  # Load all files into the database
+    # chatbot.long_term_mem._count_docs()
     # response = chatbot.respond("¿Cómo se denomina la partida 610.9201.23300?")
     # response = chatbot.respond(
     #     "¿Qué partida es denominada 'Indemnización por Asistencia a Tribunales'?"

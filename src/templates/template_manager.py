@@ -1,4 +1,5 @@
 import json
+from config.config import Config
 
 
 class TemplateManager:
@@ -7,7 +8,8 @@ class TemplateManager:
     @classmethod
     def load_templates(cls):
         if cls.templates is None:
-            with open("src/chatbot/templates/template.json", "r") as f:
+            templates_path = Config.get("templates_path")
+            with open(templates_path, "r") as f:
                 cls.templates = json.load(f)
 
     @classmethod

@@ -5,12 +5,10 @@ from src.response_engine import ResponseEngine
 
 
 class Chatbot:
-    def __init__(self, model_name, initial_files=None):
+    def __init__(self, model_name):
         self.long_term_mem = LongTermMemory()
         self.short_term_mem = ShortTermMemory()
         self.resp_engine = ResponseEngine(model_name)
-        if initial_files:
-            self.memorize_info(initial_files)
 
     def recall_messages(self):
         return self.short_term_mem.recall_messages()
@@ -34,13 +32,16 @@ class Chatbot:
         query = self._create_query(user_prompt, recent_messages)
 
         # Enrich the query with relevant facts from long-term memory
-        context = self.long_term_mem.get_context(query)
+        context, sources = self.long_term_mem.get_context(query)
         llm_prompt = TemplateManager.get("llm_prompt", query=query, context=context)
 
         response = self.resp_engine.generate_response(llm_prompt)
-        self.short_term_mem.add_message({"role": "assistant", "content": response})
+        response_n_sources = f"{response}\n\n{sources}"
+        self.short_term_mem.add_message(
+            {"role": "assistant", "content": response_n_sources}
+        )
 
-        return response
+        return response_n_sources
 
     def _create_query(self, prompt, recent_messages):
         # TODO: Implement this method

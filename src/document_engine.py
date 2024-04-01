@@ -168,13 +168,12 @@ class DocumentEngine:
                     logging.info(
                         f"Document ID {doc.id}: Chunk {chunk_counter} Length {len(chunk)}"
                     )
-                    chunked_documents.append(
-                        Document(
-                            id=f"{doc.id}_{chunk_counter}",
-                            text=chunk,
-                            metadata={"parent_id": doc.id},
-                        )
+                    new_doc = Document(
+                        id=f"{doc.id}_{chunk_counter}",
+                        text=chunk,
+                        metadata={"parent_id": doc.id},
                     )
+                    chunked_documents.append(new_doc)
                     chunk_counter += 1
 
         return chunked_documents

@@ -9,7 +9,7 @@ from config.config import Config
 from src.document_engine import Document, DocumentEngine
 from pymilvus import connections
 from pymilvus import MilvusClient, DataType, Collection
-from pymilvus.client.abstract import AnnSearchRequest, WeightedRanker
+from pymilvus.client.abstract import AnnSearchRequest, WeightedRanker, SearchResult
 from milvus_model.hybrid import BGEM3EmbeddingFunction
 from milvus_model.sparse import BM25EmbeddingFunction
 from milvus_model.sparse.bm25.tokenizers import build_default_analyzer
@@ -28,7 +28,8 @@ class LongTermMemory:
         self._dense_ef = self._load_embedding_function("dense")
         self._sparse_ef = self._load_embedding_function("sparse")
 
-        self._docs, self._chunks = self._load_collections()
+        self._docs, self._chunks = None, None
+        self._load_collections()
 
     def _connect(self):
         host = Config.get("MILVUS_HOST")
@@ -88,14 +89,12 @@ class LongTermMemory:
         ]
 
         # Load collections for all run modes
-        docs = self._load_docs_collection()
-        chunks = self._load_chunks_collection()
+        self._docs = self._load_docs_collection()
+        self._chunks = self._load_chunks_collection()
 
         # Add documents if not in NO_RES_NO_LOAD mode (no reset, no load)
         if run_mode != "NO_RES_NO_LOAD":
             self.add_documents(initial_files)
-
-        return docs, chunks
 
     def _load_docs_collection(self):
         if not self._client.has_collection("docs"):
@@ -251,12 +250,13 @@ class LongTermMemory:
         # Generate documents, format them into database records, and insert them
         documents = self._doc_engine.generate_documents(files, type)
         doc_records = self._generate_doc_records(documents)
-        self._client.insert(collection_name="docs", data=doc_records)
+        # self._client.insert(collection_name="docs", data=doc_records)
+        self._docs.insert(doc_records)
 
         # Generate chunks, format them into database records, and insert them
         chunks = self._doc_engine._chunk_documents(documents)
         chunk_records = self._generate_chunk_records(chunks)
-        self._client.insert(collection_name="chunks", data=chunk_records)
+        self._chunks.insert(chunk_records)
 
     def _generate_doc_records(self, documents: List[Document]) -> List[List[any]]:
         """
@@ -381,7 +381,7 @@ class LongTermMemory:
         n_results = 10
         results = self._search_documents(query, n_results)
         documents = self._retrieve_documents(results, n_docs)
-        context = self._format_context(documents)
+        context = self._create_context(documents)
 
         return context
 
@@ -436,17 +436,17 @@ class LongTermMemory:
             limit=n_results,
         )
 
-        return response
+        return response[0]
 
     def _retrieve_documents(
-        self, response: List[AnnSearchRequest], n_docs: int
+        self, response: SearchResult, n_docs: int
     ) -> List[Document]:
         # Retrieve n_docs unique parent IDs from the response
-        all_parent_ids = [hit["fields"]["parent_id"] for hit in response.hits]
         unique_parent_ids = []
-        for id in all_parent_ids:
-            if id not in unique_parent_ids:
-                unique_parent_ids.append(id)
+        for hit in response:
+            parent_id = hit.entity.get("parent_id")
+            if parent_id not in unique_parent_ids:
+                unique_parent_ids.append(parent_id)
                 if len(unique_parent_ids) == n_docs:
                     break
 
@@ -456,21 +456,28 @@ class LongTermMemory:
 
         return documents
 
-    def _format_context(self, documents: List[Document]) -> str:
+    def _create_context(self, documents: List[Document]) -> (str, str):
         context = ""
+        sources_list = []
+
         for doc in documents:
-            # Extract decree number from metadata
-            metadata = json.loads(doc.metadata)
-            doc_number = metadata["number"]
-            # Crear header for each document
-            header = f"###DECRETO {doc_number}###\n"
+            # Create header for each document
+            header = f"###DECRETO {doc.metadata['number']}###\n"
             # Add the text of the document to the context
             context += f"{header}{doc.text}\n\n"
-        return context
+            # Record the source of the document, which is its number and page
+            sources_list.append(
+                f"- Decreto {doc.metadata['number']} (página {doc.metadata['page']})"
+            )
+
+        # Combine the sources into a single string prefixed with "SOURCES:"
+        sources = "Fuentes consultadas:\n" + "\n".join(sources_list)
+
+        return context, sources
 
     def _get_document_by_id(self, data_id: str) -> Optional[Document]:
         """
-        Gets a document from the database by its ID.
+        Gets a document from the Milvus 'docs' collection by its ID.
 
         Args:
             data_id (str): Unique ID associated with the document.
@@ -478,18 +485,36 @@ class LongTermMemory:
         Returns:
             Optional[Document]: Document associated with the given ID, or None if not found.
         """
-        response = self._app.get_data(schema="RAGdb2", data_id=data_id)
+        try:
+            # Assumes 'id' field is named 'id' in the Milvus collection schema
+            # Replace 'collection_name="quick_setup"' with your actual collection name, e.g., 'docs'
+            res = self._client.get(
+                collection_name="docs",  # Use the name of your collection here
+                ids=[data_id],  # Milvus expects a list of IDs
+            )
 
-        if not response.is_successful():
-            print(f"Document with ID {data_id} not found")
+            if not res:
+                logging.info(f"Document with ID {data_id} not found")
+                return None
+
+            fields = res[0]  # Extract the fields of the result
+            # Create a new metadata dictionary that includes everything except 'id' and 'text'
+            metadata = {
+                key: value
+                for key, value in fields.items()
+                if key not in ["id", "text", "docs_vector"]
+            }
+
+            document = Document(
+                id=fields["id"],
+                text=fields.get("text", ""),
+                metadata=metadata,  # Pass the new metadata dictionary
+            )
+
+            return document
+
+        except Exception as e:
+            logging.error(
+                f"An error occurred while retrieving document ID {data_id}: {e}"
+            )
             return None
-
-        fields = response.json["fields"]
-        document = Document(
-            id=data_id,
-            parent_id="",
-            text=fields.get("text", ""),
-            metadata=fields.get("metadata", {}),
-        )
-
-        return document

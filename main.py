@@ -2,7 +2,7 @@ import os
 import streamlit as st
 from streamlit import session_state as ss
 from config.config import Config
-from src.chatbot.chatbot import Chatbot
+from src.chatbot import Chatbot
 
 
 # TODO: Empty database, load more data, connect backend-frontend
@@ -51,24 +51,6 @@ if __name__ == "__main__":
     model = Config.get("inference_model")
     chatbot = Chatbot(model)
 
-    # BOTH: Clear the database and load all files into the database
-    # NONE: No files are embedded or loaded into the database
-    run_mode = Config.get("run_mode")
-
-    if run_mode == "BOTH":
-        initial_files = []
-        folder = Config.get("raw_data_folder")
-        for root, _, files in os.walk(folder):
-            for file in files:
-                file_path = os.path.join(root, file)
-                initial_files.append(file_path)
-        chatbot.forget_info("all")  # Clear the database
-        chatbot.memorize_info(initial_files)  # Load all files into the database
-    # chatbot.long_term_mem._count_docs()
-    # response = chatbot.respond("¿Cómo se denomina la partida 610.9201.23300?")
-    # response = chatbot.respond(
-    #     "¿Qué partida es denominada 'Indemnización por Asistencia a Tribunales'?"
-    # )
     response = chatbot.respond(
         "¿Qué se les concedió a a Doña Eva Esperanza Iniesta Blázquez y Dª Eloisa Martínez Rubio?"
     )

@@ -1,5 +1,5 @@
 {
-    "run_mode": "BOTH",
+    "run_mode": "RES_LOAD",
     "db_url": "http://localhost:19530",
     "model_api_url": "http://localhost:11434/api/generate",
     "default_inference_model": "llama2",

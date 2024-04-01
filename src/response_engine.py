@@ -1,7 +1,7 @@
 from typing import Any
 from ollama import chat
 from config.config import Config
-from src.chatbot.templates.template_manager import TemplateManager
+from src.templates.template_manager import TemplateManager
 
 
 class ResponseEngine:

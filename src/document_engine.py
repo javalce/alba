@@ -3,6 +3,11 @@ import uuid
 import fitz  # PyMuPDF
 from typing import List, Dict, Optional
 from dataclasses import dataclass, field
+import logging
+from config.config import Config
+from src.utils import setup_logging
+
+setup_logging()
 
 
 @dataclass
@@ -134,3 +139,42 @@ class DocumentEngine:
         # Finally, replace the placeholder with "\n\n"
         text = text.replace(placeholder, "\n\n")
         return text
+
+    def _chunk_documents(self, documents):
+        chunk_size = Config.get("chunk_size")
+        overlap = Config.get("chunk_overlap")
+
+        chunked_documents = []
+        for doc in documents:
+            text = doc.text
+            current_pos = 0
+            text_length = len(text)
+            logging.info(f"Document ID {doc.id}: Length {text_length}")
+
+            chunk_counter = 1
+            while current_pos < text_length:
+                if current_pos + chunk_size >= text_length:
+                    chunk = text[current_pos:text_length]
+                    current_pos = text_length
+                else:
+                    end_pos = current_pos + chunk_size
+                    next_space = text.find(" ", end_pos - overlap)
+                    if next_space == -1 or next_space >= end_pos + overlap:
+                        next_space = end_pos
+                    chunk = text[current_pos:next_space].strip()
+                    current_pos = next_space
+
+                if chunk:
+                    logging.info(
+                        f"Document ID {doc.id}: Chunk {chunk_counter} Length {len(chunk)}"
+                    )
+                    chunked_documents.append(
+                        Document(
+                            id=f"{doc.id}_{chunk_counter}",
+                            text=chunk,
+                            metadata={"parent_id": doc.id},
+                        )
+                    )
+                    chunk_counter += 1
+
+        return chunked_documents

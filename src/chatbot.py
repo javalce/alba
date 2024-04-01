@@ -1,14 +1,11 @@
-from config.config import Config
-from src.chatbot.templates.template_manager import TemplateManager
-from src.chatbot.memory.long_term_memory import LongTermMemory
-from src.chatbot.memory.short_term_memory import ShortTermMemory
-from src.chatbot.response_engine import ResponseEngine
-from src.chatbot.document_engine import DocumentEngine
+from src.templates.template_manager import TemplateManager
+from src.memory.long_term_memory import LongTermMemory
+from src.memory.short_term_memory import ShortTermMemory
+from src.response_engine import ResponseEngine
 
 
 class Chatbot:
     def __init__(self, model_name, initial_files=None):
-        self.doc_engine = DocumentEngine()
         self.long_term_mem = LongTermMemory()
         self.short_term_mem = ShortTermMemory()
         self.resp_engine = ResponseEngine(model_name)
@@ -22,10 +19,8 @@ class Chatbot:
         self.short_term_mem.forget_messages()
 
     # Learn new facts from a document and store them in long-term memory
-    def memorize_info(self, files, type="decrees"):
-
-        documents = self.doc_engine.generate_documents(files, type)
-        self.long_term_mem.add_documents(documents)
+    def memorize_info(self, files, type):
+        self.long_term_mem.add_documents(files, type)
 
     def forget_info(self, collections):
         self.long_term_mem.delete_documents(collections)

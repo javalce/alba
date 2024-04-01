@@ -3,9 +3,10 @@ import json
 import pickle
 import nltk
 import logging
-from typing import List, Tuple, Optional
+from pathlib import Path
+from typing import List, Optional
 from config.config import Config
-from src.chatbot.document_engine import Document
+from src.document_engine import Document, DocumentEngine
 from pymilvus import connections
 from pymilvus import MilvusClient, DataType, Collection
 from pymilvus.client.abstract import AnnSearchRequest, WeightedRanker
@@ -13,25 +14,21 @@ from milvus_model.hybrid import BGEM3EmbeddingFunction
 from milvus_model.sparse import BM25EmbeddingFunction
 from milvus_model.sparse.bm25.tokenizers import build_default_analyzer
 from pymilvus.orm.schema import CollectionSchema, FieldSchema
+from src.utils import setup_logging
 
-# Set up basic configuration for logging
-logging.basicConfig(
-    filename=Config.get("log_path"),
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
+setup_logging()
 
 
 class LongTermMemory:
     def __init__(self):
         # Establish a connection to the Milvus server
         self._client = self._connect()
+        self._doc_engine = DocumentEngine()
 
         self._dense_ef = self._load_embedding_function("dense")
         self._sparse_ef = self._load_embedding_function("sparse")
 
-        self._docs = self._load_docs_collection()
-        self._chunks = self._load_chunks_collection()
+        self._docs, self._chunks = self._load_collections()
 
     def _connect(self):
         host = Config.get("MILVUS_HOST")
@@ -74,6 +71,31 @@ class LongTermMemory:
             return bgeM3_ef
         else:
             raise ValueError(f"Unsupported embedding function type: {ef_type}")
+
+    def _load_collections(self):
+        data_folder = Path(Config.get("raw_data_folder"))
+
+        # For RES_LOAD (reset and load), delete all documents before proceeding
+        run_mode = Config.get("run_mode")
+        if run_mode == "RES_LOAD":
+            self.delete_documents("all")
+
+        # Collect file paths using list comprehension
+        initial_files = [
+            str(file_path)
+            for file_path in data_folder.rglob("*")
+            if file_path.is_file()
+        ]
+
+        # Load collections for all run modes
+        docs = self._load_docs_collection()
+        chunks = self._load_chunks_collection()
+
+        # Add documents if not in NO_RES_NO_LOAD mode (no reset, no load)
+        if run_mode != "NO_RES_NO_LOAD":
+            self.add_documents(initial_files)
+
+        return docs, chunks
 
     def _load_docs_collection(self):
         if not self._client.has_collection("docs"):
@@ -225,20 +247,16 @@ class LongTermMemory:
         else:
             self._client.drop_collection(collection)
 
-    def add_documents(
-        self,
-        documents: List[Document],
-    ):
-        # Generate and insert document records
+    def add_documents(self, files: List[str], type: str = "decrees") -> None:
+        # Generate documents, format them into database records, and insert them
+        documents = self._doc_engine.generate_documents(files, type)
         doc_records = self._generate_doc_records(documents)
+        self._client.insert(collection_name="docs", data=doc_records)
 
-        self._docs.insert(doc_records)
-
-        # Generate chunks, their embeddings, and insert chunk records
-        chunks = self._chunk_documents(documents)
+        # Generate chunks, format them into database records, and insert them
+        chunks = self._doc_engine._chunk_documents(documents)
         chunk_records = self._generate_chunk_records(chunks)
-
-        self._chunks.insert(chunk_records)
+        self._client.insert(collection_name="chunks", data=chunk_records)
 
     def _generate_doc_records(self, documents: List[Document]) -> List[List[any]]:
         """
@@ -350,45 +368,6 @@ class LongTermMemory:
 
         insert_result = self._chunks.insert(data_to_insert)
         logging.info(f"Inserted {insert_result.insert_count} chunk records.")
-
-    def _chunk_documents(self, documents):
-        chunk_size = Config.get("chunk_size")
-        overlap = Config.get("chunk_overlap")
-
-        chunked_documents = []
-        for doc in documents:
-            text = doc.text
-            current_pos = 0
-            text_length = len(text)
-            logging.info(f"Document ID {doc.id}: Length {text_length}")
-
-            chunk_counter = 1
-            while current_pos < text_length:
-                if current_pos + chunk_size >= text_length:
-                    chunk = text[current_pos:text_length]
-                    current_pos = text_length
-                else:
-                    end_pos = current_pos + chunk_size
-                    next_space = text.find(" ", end_pos - overlap)
-                    if next_space == -1 or next_space >= end_pos + overlap:
-                        next_space = end_pos
-                    chunk = text[current_pos:next_space].strip()
-                    current_pos = next_space
-
-                if chunk:
-                    logging.info(
-                        f"Document ID {doc.id}: Chunk {chunk_counter} Length {len(chunk)}"
-                    )
-                    chunked_documents.append(
-                        Document(
-                            id=f"{doc.id}_{chunk_counter}",
-                            text=chunk,
-                            metadata={"parent_id": doc.id},
-                        )
-                    )
-                    chunk_counter += 1
-
-        return chunked_documents
 
     def get_context(self, query: str, n_docs=2) -> List[Document]:
         """

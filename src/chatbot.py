@@ -44,6 +44,6 @@ class Chatbot:
         return response_n_sources
 
     def _create_query(self, prompt, recent_messages):
-        # TODO: Implement this method
-        # Combine the user prompt with recent chat history to create a self-contained query
+        # This method should combine the prompt with recent chat history to create a self-contained query
+        # However, for now, we will simply return the user prompt as is due to latency issues
         return prompt

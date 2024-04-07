@@ -31,6 +31,10 @@ class LongTermMemory:
         self._docs, self._chunks = None, None
         self._load_collections()
 
+        # Define the weights for the hybrid search
+        self.DENSE_SEARCH_WEIGHT = 0.5
+        self.SPARSE_SEARCH_WEIGHT = 0.5
+
     def _connect(self):
         host = Config.get("MILVUS_HOST")
         port = Config.get("MILVUS_PORT")
@@ -396,7 +400,7 @@ class LongTermMemory:
         Returns:
             The context as a string, aggregated from relevant documents.
         """
-        # Step 1: Generate Query Embeddings
+
         # Generate dense embedding for the query
         raw_query_dense_embeddings = self._dense_ef.encode_queries([query])
         dense_query_embedding = [raw_query_dense_embeddings["dense"][0].tolist()]
@@ -404,10 +408,11 @@ class LongTermMemory:
         # Generate sparse embedding for the query
         raw_query_sparse_embeddings = self._sparse_ef.encode_queries(
             [query]
-        )  # Assume returns a list of embeddings
+        )  # Returns a csr_matrix
+
+        # Convert sparse embedding from csr_matrix format to a list for insertion
         sparse_query_embedding = raw_query_sparse_embeddings.toarray().tolist()
 
-        # Step 2: Create Search Requests
         # AnnSearchRequest for dense embeddings
         dense_search_request = AnnSearchRequest(
             data=dense_query_embedding,
@@ -431,7 +436,9 @@ class LongTermMemory:
                 dense_search_request,
                 sparse_search_request,
             ],  # List of search requests
-            rerank=WeightedRanker(0.5, 0.5),  # Reranking strategy
+            rerank=WeightedRanker(
+                self.DENSE_SEARCH_WEIGHT, self.SPARSE_SEARCH_WEIGHT
+            ),  # Reranking strategy
             output_fields=["parent_id"],
             limit=n_results,
         )

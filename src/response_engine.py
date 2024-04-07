@@ -51,17 +51,3 @@ class ResponseEngine:
         )
 
         return response["message"]["content"]
-
-    def _create_query(self, user_prompt: str, recent_messages: str) -> str:
-        """
-        Combines the user prompt with recent chat history to create a self-contained query.
-
-        Parameters:
-        - user_prompt (str): The latest user prompt.
-        - recent_messages (str): Concatenated string of recent messages for context.
-
-        Returns:
-        - str: A self-contained query that combines the prompt with context.
-        """
-        # TODO: Implement this method
-        return user_prompt

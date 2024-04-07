@@ -24,7 +24,6 @@ class DocumentEngine:
         else:
             return "standard"  # Default to standard if none of the specific markers are found
 
-    # TODO: Add table and image parsing
     def _parse_standard_decree(
         self,
         text: str,
@@ -57,11 +56,9 @@ class DocumentEngine:
         )
         return doc
 
-    # TODO: Refine parsing and prepare for multipage decrees
     def _parse_SEPEI_decree(
         self, text: str, page_number: int, decree_number: str, decree_date: str
     ) -> Document:
-        # TODO: Implement specific parsing logic for SEPEI decrees here
         doc = Document(
             id=f"{decree_number}_{page_number}",
             text=text.strip(),

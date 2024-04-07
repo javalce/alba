@@ -5,15 +5,14 @@ from config.config import Config
 from src.chatbot import Chatbot
 
 
-# TODO: Empty database, load more data, connect backend-frontend
 def main():
     # Configure page
     st.set_page_config(
-        page_title="Alba - Asistente Local de Búsqueda de Albacete",
+        page_title="Alba - Asistente de Búsqueda Local y Privado",
         page_icon="👩",
         layout="wide",
     )
-    st.title("Alba 👩 (Asistente Local de Búsqueda de Albacete)")
+    st.title("Alba 👩 (Asistente de Búsqueda Local y Privado)")
     # Initialize chatbot if necessary
     if "chatbot" not in ss:
         model = Config.get("inference_model")

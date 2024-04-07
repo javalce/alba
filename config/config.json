@@ -17,5 +17,5 @@
     "doc_size": 8192,
     "chunk_size": 512,
     "chunk_overlap": 128,
-    "log_path": "logs/log.txt"
+    "log_path": "logs/log.log"
 }

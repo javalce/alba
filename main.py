@@ -17,6 +17,7 @@ def main():
     if "chatbot" not in ss:
         model = Config.get("inference_model")
         ss.chatbot = Chatbot(model)
+        st.write("Chatbot initialized!")  # Debug message
 
     # Display chat messages from history on app rerun
     messages = ss.chatbot.recall_messages()

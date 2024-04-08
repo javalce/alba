@@ -1,5 +1,5 @@
 {
-    "run_mode": "NO_RES_NO_LOAD",
+    "run_mode": "RES_LOAD",
     "db_url": "http://localhost:19530",
     "model_api_url": "http://localhost:11434/api/generate",
     "templates_path": "src/templates/template.json",
@@ -17,5 +17,7 @@
     "doc_size": 8192,
     "chunk_size": 512,
     "chunk_overlap": 128,
-    "log_path": "logs/log.log"
+    "log_path": "logs/log.log",
+    "testset_path": "./data/evals/testset.json",
+    "testset_sources_path": "./data/evals/testset_sources.json"
 }

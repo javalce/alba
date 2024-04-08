@@ -1,5 +1,5 @@
 import os
-import json
+from tqdm import tqdm
 import pickle
 import nltk
 import logging
@@ -85,19 +85,18 @@ class LongTermMemory:
         if run_mode == "RES_LOAD":
             self.delete_documents("all")
 
-        # Collect file paths using list comprehension
-        initial_files = [
-            str(file_path)
-            for file_path in data_folder.rglob("*")
-            if file_path.is_file()
-        ]
-
         # Load collections for all run modes
         self._docs = self._load_docs_collection()
         self._chunks = self._load_chunks_collection()
 
         # Add documents if not in NO_RES_NO_LOAD mode (no reset, no load)
-        if run_mode != "NO_RES_NO_LOAD":
+        if run_mode in ("NO_RES_LOAD", "RES_LOAD"):
+            # Collect file paths using list comprehension
+            initial_files = [
+                str(file_path)
+                for file_path in data_folder.rglob("*")
+                if file_path.is_file()
+            ]
             self.add_documents(initial_files)
 
     def _load_docs_collection(self):
@@ -258,9 +257,56 @@ class LongTermMemory:
         self._docs.insert(doc_records)
 
         # Generate chunks, format them into database records, and insert them
-        chunks = self._doc_engine._chunk_documents(documents)
+        self._process_and_insert_chunks(documents)
+
+    def _process_and_insert_chunks(self, documents, batch_size: int = 100):
+        """
+        Process documents in batches, create chunk records, insert them into the database,
+        and log the process with a progress bar.
+
+        Args:
+            documents (List[Document]): List of Document objects to process.
+            batch_size (int): Number of documents to process in each batch.
+        """
+
+        # Calculate total number of batches
+        total_batches = len(documents) // batch_size + (
+            1 if len(documents) % batch_size > 0 else 0
+        )
+
+        # Process documents in batches
+        for i in tqdm(range(total_batches), desc="Processing and inserting chunks"):
+            # Determine batch slice
+            start_idx = i * batch_size
+            end_idx = min((i + 1) * batch_size, len(documents))
+
+            # Select batch documents
+            batch_documents = documents[start_idx:end_idx]
+
+            # Generate and insert chunk records for the current batch
+            self._process_and_insert_chunk_batch(batch_documents)
+
+        logging.info("Completed processing and inserting chunks.")
+
+    def _process_and_insert_chunk_batch(self, batch_documents: List[Document]):
+        """
+        Generate chunk records for a batch of documents and insert them into the database.
+
+        Args:
+            batch_documents (List[Document]): List of Document objects to process.
+        """
+        # Assuming _generate_chunk_records and _insert_chunk_records are defined as per the initial class definition
+
+        # Generate chunks for the documents
+        chunks = self._doc_engine._chunk_documents(batch_documents)
+
+        # Generate chunk records, including both dense and sparse embeddings
         chunk_records = self._generate_chunk_records(chunks)
-        self._chunks.insert(chunk_records)
+
+        # Insert chunk records into the database
+        self._insert_chunk_records(chunk_records)
+
+        logging.info(f"Processed and inserted {len(chunk_records)} chunk records.")
 
     def _generate_doc_records(self, documents: List[Document]) -> List[List[any]]:
         """
@@ -361,16 +407,7 @@ class LongTermMemory:
         """
         Batch load chunk records, including embeddings, into the _chunks collection.
         """
-        field_values = list(zip(*chunk_records))
-        data_to_insert = {
-            "id": field_values[0],
-            "dense_vector": field_values[1],
-            "sparse_vector": field_values[2],
-            "parent_id": field_values[3],
-            "text": field_values[4],
-        }
-
-        insert_result = self._chunks.insert(data_to_insert)
+        insert_result = self._chunks.insert(chunk_records)
         logging.info(f"Inserted {insert_result.insert_count} chunk records.")
 
     def get_context(self, query: str, n_docs=2) -> List[Document]:
@@ -383,13 +420,15 @@ class LongTermMemory:
             List[Document]: List of relevant documents.
         """
         n_results = 10
-        results = self._search_documents(query, n_results)
-        documents = self._retrieve_documents(results, n_docs)
+        results = self._find_relevant_chunks(query, n_results)
+        documents = self._retrieve_parent_documents(results, n_docs)
         context = self._create_context(documents)
 
         return context
 
-    def _search_documents(self, query: str, n_results: int) -> List[AnnSearchRequest]:
+    def _find_relevant_chunks(
+        self, query: str, n_results: int
+    ) -> List[AnnSearchRequest]:
         """
         Retrieves relevant context from the database based on a query.
 
@@ -417,7 +456,7 @@ class LongTermMemory:
         dense_search_request = AnnSearchRequest(
             data=dense_query_embedding,
             anns_field="dense_vector",
-            param={"metric_type": "IP", "params": {"nprobe": 10}},
+            param={"metric_type": "IP", "params": {"nprobe": 100}},
             limit=n_results,
         )
 
@@ -425,7 +464,7 @@ class LongTermMemory:
         sparse_search_request = AnnSearchRequest(
             data=sparse_query_embedding,
             anns_field="sparse_vector",
-            param={"metric_type": "IP", "params": {"nprobe": 10}},
+            param={"metric_type": "IP", "params": {"nprobe": 100}},
             limit=n_results,
         )
 
@@ -445,7 +484,7 @@ class LongTermMemory:
 
         return response[0]
 
-    def _retrieve_documents(
+    def _retrieve_parent_documents(
         self, response: SearchResult, n_docs: int
     ) -> List[Document]:
         # Retrieve n_docs unique parent IDs from the response

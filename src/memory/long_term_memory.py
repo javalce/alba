@@ -1,10 +1,15 @@
 import os
+import shutil
 from tqdm import tqdm
+import fitz
 import pickle
 import nltk
+import uuid
+import json
+from pathlib import Path
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
 from config.config import Config
 from src.document_engine import Document, DocumentEngine
 from pymilvus import connections
@@ -21,19 +26,21 @@ setup_logging()
 
 class LongTermMemory:
     def __init__(self):
+        self.run_mode = Config.get("run_mode")
+
+        # Define the weights for the hybrid search
+        self.DENSE_SEARCH_WEIGHT = 0.5
+        self.SPARSE_SEARCH_WEIGHT = 0.5
+
         # Establish a connection to the Milvus server
         self._client = self._connect()
-        self._doc_engine = DocumentEngine()
 
+        self._doc_engine = DocumentEngine()
         self._dense_ef = self._load_embedding_function("dense")
         self._sparse_ef = self._load_embedding_function("sparse")
 
         self._docs, self._chunks = None, None
         self._load_collections()
-
-        # Define the weights for the hybrid search
-        self.DENSE_SEARCH_WEIGHT = 0.5
-        self.SPARSE_SEARCH_WEIGHT = 0.5
 
     def _connect(self):
         host = Config.get("MILVUS_HOST")
@@ -52,18 +59,25 @@ class LongTermMemory:
                 with open(model_path, "rb") as file:
                     bm25_ef = pickle.load(file)
             else:
+                # Check if the 'stopwords' dataset is not already loaded in NLTK
                 if "stopwords" not in nltk.corpus.util.lazy_imports:
+                    # Download the 'stopwords' dataset using NLTK's download utility
                     nltk.download("stopwords")
 
+                # Create an analyzer for processing documents, here specifying Spanish language
                 analyzer = build_default_analyzer(language="sp")
+                # Initialize a BM25 embedding function with the previously created analyzer
                 bm25_ef = BM25EmbeddingFunction(analyzer)
 
-                # If a corpus is provided, fit the model to the corpus
+                # Check if a corpus is provided to fit the model
                 if corpus:
+                    # Fit the BM25 embedding function to the provided corpus
                     bm25_ef.fit(corpus)
-                    # Serialize and save the model to a file
+                    # Serialize the BM25 model into a file for persistence
                     with open(model_path, "wb") as file:
-                        pickle.dump(bm25_ef, file)
+                        pickle.dump(
+                            bm25_ef, file
+                        )  # Use Python's pickle module for serialization
 
             return bm25_ef
         elif ef_type == "dense":
@@ -78,11 +92,10 @@ class LongTermMemory:
             raise ValueError(f"Unsupported embedding function type: {ef_type}")
 
     def _load_collections(self):
-        data_folder = Path(Config.get("raw_data_folder"))
-
-        # For RES_LOAD (reset and load), delete all documents before proceeding
-        run_mode = Config.get("run_mode")
-        if run_mode == "RES_LOAD":
+        # RES_LOAD (reset and load): delete all documents and load new ones
+        # NO_RES_LOAD (no reset, load): do not delete documents, but load new ones
+        # NO_RES_NO_LOAD (no reset, no load): do not delete or load documents
+        if self.run_mode == "RES_LOAD":
             self.delete_documents("all")
 
         # Load collections for all run modes
@@ -90,14 +103,74 @@ class LongTermMemory:
         self._chunks = self._load_chunks_collection()
 
         # Add documents if not in NO_RES_NO_LOAD mode (no reset, no load)
-        if run_mode in ("NO_RES_LOAD", "RES_LOAD"):
-            # Collect file paths using list comprehension
-            initial_files = [
-                str(file_path)
-                for file_path in data_folder.rglob("*")
-                if file_path.is_file()
-            ]
-            self.add_documents(initial_files)
+        if self.run_mode == "RES_LOAD":
+            self._ingest_folder(True)
+        elif self.run_mode == "NO_RES_LOAD":
+            self._ingest_folder(False)
+        elif self.run_mode != "NO_RES_NO_LOAD":
+            raise ValueError(f"Unsupported run mode: {self.run_mode}")
+
+    def _ingest_folder(self, first_load: bool):
+        # Define paths using configuration settings
+        raw_folder = Path(Config.get("raw_data_folder"))
+        processed_folder = Path(Config.get("processed_data_folder"))
+        staged_folder = Path(Config.get("stage_data_folder"))
+        staged_folder.mkdir(exist_ok=True)  # Ensure the staging folder exists
+
+        if first_load:
+            # Read and generate documents from PDF files in the raw data folder
+            files = [str(file) for file in raw_folder.glob("*.pdf")]
+            documents = self._doc_engine.generate_documents(files, "decrees")
+
+            # Insert the generated document records into the database
+            doc_records = self._generate_doc_records(documents)
+            self._client.insert(collection_name="docs", data=doc_records)
+
+            # Generate chunk records from the documents
+            chunks = self._doc_engine._chunk_documents(documents)
+            chunk_records = self._generate_chunk_records(chunks)
+
+            # When loading a full folder, save chunk records to JSON files in the staging folder
+            # to avoid memory issues when inserting a large number of records;
+            # this also allows for partial recovery from errors
+            record_buffer = []
+            file_count = 0  # To keep track of file naming
+
+            # Batch and save chunk records to JSON files in the staging folder
+            for i, record in enumerate(chunk_records):
+                record_buffer.append(record)
+                # Write to file either when the buffer size reaches 100 or at the end of the list
+                if len(record_buffer) >= 100 or i == len(chunk_records) - 1:
+                    file_path = staged_folder / f"chunks_{file_count}.json"
+                    with open(file_path, "w") as f:
+                        json.dump(record_buffer, f)
+                    record_buffer = []  # Reset buffer for the next batch
+                    file_count += 1  # Increment file counter
+
+            # Load chunk records from saved files, insert into database, and move processed files
+            for file_path in sorted(staged_folder.iterdir()):
+                with open(file_path, "r") as f:
+                    chunks = json.load(f)
+
+                # Insert chunk records into the database
+                self._insert_chunk_records(chunks)
+                # Move the file to the processed folder after successful insertion
+                shutil.move(str(file_path), processed_folder)
+
+        else:
+            # Handle error recovery or continuation from previously interrupted process
+            for file_path in sorted(staged_folder.iterdir()):
+                try:
+                    with open(file_path, "r") as f:
+                        chunks = json.load(f)
+
+                    # Insert chunk records and move the file if insertion is successful
+                    self._insert_chunk_records(chunks)
+                    shutil.move(str(file_path), processed_folder)
+                except Exception as e:
+                    logging.error(f"Error processing file {file_path}: {e}")
+                    # Continue to next file, allowing for partial recovery from errors
+                    continue
 
     def _load_docs_collection(self):
         if not self._client.has_collection("docs"):
@@ -180,7 +253,7 @@ class LongTermMemory:
                 FieldSchema(
                     name="text",
                     dtype=DataType.VARCHAR,
-                    max_length=Config.get("doc_size"),
+                    max_length=Config.get("max_doc_size"),
                 ),
                 # Add a docs vector; Milvus requires at least one vector field in the schema
                 # This is not used, just a workaround to satisfy the schema requirements
@@ -232,12 +305,6 @@ class LongTermMemory:
 
         return schema
 
-    def _count_docs(self) -> int:
-        """
-        Counts the number of documents in the database.
-        """
-        pass
-
     def delete_documents(self, collection: str) -> None:
         """
         Deletes documents from database.
@@ -253,38 +320,53 @@ class LongTermMemory:
         # Generate documents, format them into database records, and insert them
         documents = self._doc_engine.generate_documents(files, type)
         doc_records = self._generate_doc_records(documents)
-        # self._client.insert(collection_name="docs", data=doc_records)
-        self._docs.insert(doc_records)
+        self._client.insert(collection_name="docs", data=doc_records)
 
         # Generate chunks, format them into database records, and insert them
         self._process_and_insert_chunks(documents)
 
-    def _process_and_insert_chunks(self, documents, batch_size: int = 100):
+    def _process_and_insert_chunks(
+        self, documents, batch_size: int = 10, start_from: int = 0
+    ):
         """
         Process documents in batches, create chunk records, insert them into the database,
-        and log the process with a progress bar.
+        and log the process with a progress bar. Updated to include a starting index.
 
         Args:
             documents (List[Document]): List of Document objects to process.
             batch_size (int): Number of documents to process in each batch.
+            start_from (int): Index to start processing from.
         """
 
-        # Calculate total number of batches
-        total_batches = len(documents) // batch_size + (
-            1 if len(documents) % batch_size > 0 else 0
+        # Adjust total batches based on the new start_from parameter
+        adjusted_docs = documents[start_from:]
+        total_batches = len(adjusted_docs) // batch_size + (
+            1 if len(adjusted_docs) % batch_size > 0 else 0
         )
 
-        # Process documents in batches
-        for i in tqdm(range(total_batches), desc="Processing and inserting chunks"):
-            # Determine batch slice
-            start_idx = i * batch_size
-            end_idx = min((i + 1) * batch_size, len(documents))
+        # Process documents in batches starting from start_from
+        for i in tqdm(
+            range(total_batches), desc="Processing and inserting document chunks"
+        ):
+            # Adjust batch slice indices based on start_from
+            start_idx = start_from + i * batch_size
+            end_idx = min(start_from + (i + 1) * batch_size, len(documents))
 
             # Select batch documents
             batch_documents = documents[start_idx:end_idx]
 
-            # Generate and insert chunk records for the current batch
-            self._process_and_insert_chunk_batch(batch_documents)
+            try:
+                # Generate and insert chunk records for the current batch
+                self._process_and_insert_chunk_batch(batch_documents)
+            except Exception as e:
+                # Log the next start_from value before raising the error
+                next_start_from = (
+                    start_idx + batch_size
+                )  # Or end_idx for more precision
+                logging.error(
+                    f"Error processing documents. Next start_from should be: {next_start_from}. Error: {e}"
+                )
+                raise  # Rethrow the exception or handle it as you see fit
 
         logging.info("Completed processing and inserting chunks.")
 
@@ -295,7 +377,6 @@ class LongTermMemory:
         Args:
             batch_documents (List[Document]): List of Document objects to process.
         """
-        # Assuming _generate_chunk_records and _insert_chunk_records are defined as per the initial class definition
 
         # Generate chunks for the documents
         chunks = self._doc_engine._chunk_documents(batch_documents)
@@ -306,46 +387,39 @@ class LongTermMemory:
         # Insert chunk records into the database
         self._insert_chunk_records(chunk_records)
 
-        logging.info(f"Processed and inserted {len(chunk_records)} chunk records.")
+        logging.info(f"Processed and inserted {len(chunk_records[0])} chunk records.")
 
-    def _generate_doc_records(self, documents: List[Document]) -> List[List[any]]:
-        """
-        Prepare the records for inserting into the _docs collection.
-        """
+    def _generate_doc_records(self, documents: List[Document]) -> List[Dict[str, any]]:
         records = []
         for doc in documents:
-            record = [
-                doc.id,  # Assuming the ID is an integer or can be represented as one
-                doc.metadata.get("page", 0),
-                doc.metadata.get("date", ""),
-                doc.metadata.get("type", ""),
-                int(
-                    doc.metadata.get("number", 0)
-                ),  # Assuming number can be represented as int
-                doc.text[: Config.get("doc_size")],  # Truncate text if necessary
-                [0.0, 0.0],  # Dummy vector for the docs_vector field
-            ]
+            record = {
+                "id": doc.id,
+                "page": doc.metadata.get("page", 0),
+                "date": doc.metadata.get("date", ""),
+                "type": doc.metadata.get("type", ""),
+                "number": (
+                    int(doc.metadata.get("number", 0))
+                    if doc.metadata.get("number") is not None
+                    else 0
+                ),  # Ensure number is not None
+                "text": doc.text[
+                    : Config.get("doc_size")
+                ],  # Truncate text if necessary
+                "docs_vector": [0.0, 0.0],  # Dummy vector for the docs_vector field
+            }
             records.append(record)
+        # TODO: Manage scenarios where number is None
+        return records
 
-        # Transpose doc_records to match Milvus' expected input format for insert
-        transposed_records = list(map(list, zip(*records)))
-        return transposed_records
-
-    def _generate_chunk_records(self, chunks: List[Document]) -> List[List[any]]:
+    def _generate_chunk_records(self, chunks: List[Document]) -> List[Dict[str, any]]:
         """
         Prepare the records for inserting into the _chunks collection,
-        including both dense and sparse embeddings.
+        including both dense and sparse embeddings, formatted as dictionaries.
         """
         records = []
 
         # Extract chunk texts to generate embeddings
         chunk_texts = [chunk.text for chunk in chunks]
-        for chunk in chunks:
-            if len(chunk.text) == 0:
-                print(f"Empty chunk text for document ID: {chunk.id}")
-            elif len(chunk.text) > Config.get("chunk_size"):
-                print(f"Chunk text exceeds maximum size for document ID: {chunk.id}")
-
         # Generate dense embeddings using the BGE-M3 function
         dense_embeddings = self._dense_ef.encode_documents(chunk_texts)["dense"]
 
@@ -354,30 +428,24 @@ class LongTermMemory:
 
         # Convert sparse embeddings from csr_array format to a list for insertion
         sparse_embeddings = [
-            sparse_embedding.toarray().tolist()
+            sparse_embedding.toarray().tolist()[
+                0
+            ]  # Ensure it's a list of lists, not a list of arrays
             for sparse_embedding in raw_sparse_embeddings
         ]
 
         # Prepare records with both embeddings for each chunk
         for i, chunk in enumerate(chunks):
-            # Prepare the record for the current chunk with the necessary fields
-            record = [
-                chunk.id,
-                dense_embeddings[
-                    i
-                ].tolist(),  # Use the dense embedding and convert to list
-                sparse_embeddings[i][0],  # Use the converted sparse embedding
-                chunk.metadata.get("parent_id", 0),  # Extract parent_id from metadata
-                chunk.text[
-                    : Config.get("chunk_size")
-                ],  # Truncate text to specified chunk size if necessary
-            ]
-
-            # Append the prepared record to the list of records
+            record = {
+                "id": chunk.id,
+                "dense_vector": dense_embeddings[i].tolist(),  # Dense embedding
+                "sparse_vector": sparse_embeddings[i],  # Sparse embedding
+                "parent_id": chunk.metadata.get("parent_id", 0),  # Parent document ID
+                "text": chunk.text[: Config.get("chunk_size")],  # Truncated text
+            }
             records.append(record)
 
-        transposed_records = list(map(list, zip(*records)))
-        return transposed_records
+        return records
 
     def _insert_doc_records(self, doc_records: List[List[any]]) -> None:
         """
@@ -532,10 +600,8 @@ class LongTermMemory:
             Optional[Document]: Document associated with the given ID, or None if not found.
         """
         try:
-            # Assumes 'id' field is named 'id' in the Milvus collection schema
-            # Replace 'collection_name="quick_setup"' with your actual collection name, e.g., 'docs'
             res = self._client.get(
-                collection_name="docs",  # Use the name of your collection here
+                collection_name="docs",
                 ids=[data_id],  # Milvus expects a list of IDs
             )
 

@@ -1,5 +1,7 @@
 import re
-import uuid
+import os
+import pickle
+from tqdm import tqdm
 import fitz  # PyMuPDF
 from typing import List, Dict, Optional
 from dataclasses import dataclass, field
@@ -81,16 +83,16 @@ class DocumentEngine:
 
         for file_path in files:
             pdf = fitz.open(file_path)
-            for page_num in range(len(pdf)):
+            for page_num in tqdm(range(len(pdf)), desc=f"Processing {file_path}"):
                 raw_text = pdf[page_num].get_text("text")
                 text = self._clean_text(raw_text)
 
                 number_n_date = decree_number_n_date_pattern.search(text)
                 number = number_n_date.group(1) if number_n_date else None
                 date = number_n_date.group(2) if number_n_date else None
-
-                # Determine if this page continues the previous decree
-                multi_page_decree = number == previous_decree_number
+                multi_page_decree = (
+                    number == previous_decree_number
+                )  # Determine if this page continues the previous decree
 
                 decree_type = self._identify_decree_type(text)
                 if decree_type == "standard":
@@ -101,10 +103,22 @@ class DocumentEngine:
                     doc = self._parse_SEPEI_decree(text, page_num + 1, number, date)
 
                 documents.append(doc)
-                previous_decree_number = number  # Update the previous decree number
+                previous_decree_number = number
 
             pdf.close()
         return documents
+
+    def _clean_text(self, text: str) -> str:
+        placeholder = (
+            "\ue000"  # Using a Private Use Area Unicode character as a placeholder
+        )
+        text = (
+            text.replace("\n\n", placeholder)
+            .replace("\n \n", placeholder)
+            .replace("\n", " ")
+            .replace(placeholder, "\n\n")
+        )
+        return text
 
     def generate_documents(self, files, files_type) -> List[Document]:
         # Convert to list if necessary
@@ -146,7 +160,6 @@ class DocumentEngine:
             text = doc.text
             current_pos = 0
             text_length = len(text)
-            logging.info(f"Document ID {doc.id}: Length {text_length}")
 
             chunk_counter = 1
             while current_pos < text_length:
@@ -162,9 +175,6 @@ class DocumentEngine:
                     current_pos = next_space
 
                 if chunk:
-                    logging.info(
-                        f"Document ID {doc.id}: Chunk {chunk_counter} Length {len(chunk)}"
-                    )
                     new_doc = Document(
                         id=f"{doc.id}_{chunk_counter}",
                         text=chunk,

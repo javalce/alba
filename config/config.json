@@ -1,5 +1,5 @@
 {
-    "run_mode": "RES_LOAD",
+    "run_mode": "NO_RES_LOAD",
     "db_url": "http://localhost:19530",
     "model_api_url": "http://localhost:11434/api/generate",
     "templates_path": "src/templates/template.json",
@@ -12,9 +12,10 @@
     "MILVUS_PORT": "19530",
     "raw_data_folder": "data/raw/",
     "processed_data_folder": "data/processed/",
+    "stage_data_folder": "data/stage/",
     "embeddings_path": "data/embeddings/",
     "batch_size": 100,
-    "doc_size": 8192,
+    "max_doc_size": 8192,
     "chunk_size": 512,
     "chunk_overlap": 128,
     "log_path": "logs/log.log",

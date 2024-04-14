@@ -15,8 +15,7 @@ def main():
     st.title("Alba 👩 (Asistente de Búsqueda Local y Privado)")
     # Initialize chatbot if necessary
     if "chatbot" not in ss:
-        model = Config.get("inference_model")
-        ss.chatbot = Chatbot(model)
+        ss.chatbot = Chatbot()
         st.write("Chatbot initialized!")  # Debug message
 
     # Display chat messages from history on app rerun
@@ -32,7 +31,7 @@ def main():
             st.markdown(prompt)
 
         # Get chatbot response and display it in chat
-        response = ss.chatbot.respond(prompt)
+        response = ss.chatbot.respond_w_sources(prompt)
         with st.chat_message("assistant"):
             st.write(response)
 

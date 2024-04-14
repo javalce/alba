@@ -1,4 +1,5 @@
 import os
+import torch
 import shutil
 from tqdm import tqdm
 import fitz
@@ -81,11 +82,17 @@ class LongTermMemory:
 
             return bm25_ef
         elif ef_type == "dense":
-            # More info here: https://milvus.io/docs/embed-with-bgm-m3.md
+            # Determina el dispositivo en función de la disponibilidad de CUDA
+            device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
+            # Configura la función de embedding para usar GPU si está disponible, y FP16 si es apropiado
+            use_fp16 = True if device.startswith("cuda") else False
+
+            # Más información aquí: https://milvus.io/docs/embed-with-bgm-m3.md
             bgeM3_ef = BGEM3EmbeddingFunction(
-                model_name="BAAI/bge-m3",  # Specify the model name
-                device="cpu",  # Specify the device to use, e.g., 'cpu' or 'cuda:0'
-                use_fp16=False,  # Specify whether to use fp16. Set to `False` if `device` is `cpu`.
+                model_name="BAAI/bge-m3",  # Especifica el nombre del modelo
+                device=device,  # Usa el dispositivo determinado (CPU o GPU)
+                use_fp16=use_fp16,  # Usa FP16 si está en CUDA, de lo contrario False
             )
             return bgeM3_ef
         else:
@@ -125,6 +132,7 @@ class LongTermMemory:
             # Insert the generated document records into the database
             doc_records = self._generate_doc_records(documents)
             self._client.insert(collection_name="docs", data=doc_records)
+            logging.info(f"Finished inserting {len(doc_records)} document records.")
 
             # Generate chunk records from the documents
             chunks = self._doc_engine._chunk_documents(documents)
@@ -156,7 +164,6 @@ class LongTermMemory:
                 self._insert_chunk_records(chunks)
                 # Move the file to the processed folder after successful insertion
                 shutil.move(str(file_path), processed_folder)
-
         else:
             # Handle error recovery or continuation from previously interrupted process
             for file_path in sorted(staged_folder.iterdir()):
@@ -171,6 +178,7 @@ class LongTermMemory:
                     logging.error(f"Error processing file {file_path}: {e}")
                     # Continue to next file, allowing for partial recovery from errors
                     continue
+        logging.info(f"Finished inserting {len(chunk_records)} chunk records.")
 
     def _load_docs_collection(self):
         if not self._client.has_collection("docs"):
@@ -315,14 +323,17 @@ class LongTermMemory:
                 self._client.drop_collection(collection_name)
         else:
             self._client.drop_collection(collection)
+        logging.info(f"Deleted documents from collection: {collection}")
 
     def add_documents(self, files: List[str], type: str = "decrees") -> None:
+        logging.info(f"Adding documents of type {type} to the database.")
         # Generate documents, format them into database records, and insert them
         documents = self._doc_engine.generate_documents(files, type)
         doc_records = self._generate_doc_records(documents)
         self._client.insert(collection_name="docs", data=doc_records)
 
         # Generate chunks, format them into database records, and insert them
+        logging.info("Processing and inserting chunk records.")
         self._process_and_insert_chunks(documents)
 
     def _process_and_insert_chunks(
@@ -386,7 +397,6 @@ class LongTermMemory:
 
         # Insert chunk records into the database
         self._insert_chunk_records(chunk_records)
-
         logging.info(f"Processed and inserted {len(chunk_records[0])} chunk records.")
 
     def _generate_doc_records(self, documents: List[Document]) -> List[Dict[str, any]]:
@@ -469,7 +479,7 @@ class LongTermMemory:
 
         # Insert the formatted records into the _docs collection.
         insert_result = self._docs.insert(data_to_insert)
-        print(f"Inserted {insert_result.insert_count} document records.")
+        logging.info(f"Inserted {insert_result.insert_count} document records.")
 
     def _insert_chunk_records(self, chunk_records):
         """

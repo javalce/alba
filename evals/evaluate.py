@@ -1,30 +1,21 @@
-import os
-from dotenv import load_dotenv
+import asyncio
+import json
 from evaluator import Evaluator
-from config.config import Config
-import pandas as pd
 
 
-def main():
-    load_dotenv()
-    evaluator = Evaluator()
-
-    # Load or generate the testset
-    testset_path = Config.get("testset_path")
-    if os.path.exists(testset_path):
-        testset = evaluator.load_testset(testset_path)
-    else:
-        testset_sources_path = Config.get("testset_sources_path")
-        testset = evaluator.generate_testset(testset_sources_path)
-        evaluator.save_testset(testset, testset_path)
-
-    # Evaluate the testset
-    evals = evaluator.evaluate_testset(testset)
-
-    # Convert evals to pandas DataFrame and print
-    df = evals.to_pandas()
-    print(df)
+# Asynchronous main function to run the evaluation
+async def main():
+    pdf_path = "path_to_your_pdf.pdf"
+    gpt4_endpoint = (
+        "https://api.openai.com/v1/chat/completions"  # Adjust with actual API endpoint
+    )
+    evaluator = Evaluator(
+        pdf_path, gpt4_endpoint, num_pages=10
+    )  # Process only the first 10 pages
+    results = await evaluator.run_evaluation()
+    print(json.dumps(results, indent=4))
 
 
+# Execute the asynchronous main function
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

@@ -1,3 +1,4 @@
+from config.config import Config
 from src.templates.template_manager import TemplateManager
 from src.memory.long_term_memory import LongTermMemory
 from src.memory.short_term_memory import ShortTermMemory
@@ -5,10 +6,11 @@ from src.response_engine import ResponseEngine
 
 
 class Chatbot:
-    def __init__(self, model_name):
+    def __init__(self):
         self.long_term_mem = LongTermMemory()
         self.short_term_mem = ShortTermMemory()
-        self.resp_engine = ResponseEngine(model_name)
+        model = Config.get("inference_model")
+        self.resp_engine = ResponseEngine(model)
 
     def recall_messages(self):
         return self.short_term_mem.recall_messages()
@@ -24,7 +26,7 @@ class Chatbot:
         self.long_term_mem.delete_documents(collections)
 
     # Respond to user prompt
-    def respond(self, user_prompt):
+    def respond_w_sources(self, user_prompt):
         self.short_term_mem.add_message({"role": "user", "content": user_prompt})
 
         # Create a self-contained query from recent chat history and the user's prompt
@@ -42,6 +44,18 @@ class Chatbot:
         )
 
         return response_n_sources
+
+    # Respond to user prompt
+    def respond_w_context(self, user_prompt):
+        # Enrich the query with relevant facts from long-term memory
+        context, sources = self.long_term_mem.get_context(user_prompt)
+        llm_prompt = TemplateManager.get(
+            "llm_prompt", query=user_prompt, context=context
+        )
+
+        response = self.resp_engine.generate_response(llm_prompt)
+        response_n_context = f"RESPONSE: {response}\n\nCONTEXT: {context}"
+        return response_n_context
 
     def _create_query(self, prompt, recent_messages):
         # This method should combine the prompt with recent chat history to create a self-contained query

@@ -11,6 +11,7 @@ from pathlib import Path
 import logging
 from pathlib import Path
 from typing import List, Optional, Dict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from config.config import Config
 from src.document_engine import Document, DocumentEngine
 from pymilvus import connections
@@ -100,7 +101,7 @@ class LongTermMemory:
 
     def _load_collections(self):
         # RES_LOAD (reset and load): delete all documents and load new ones
-        # NO_RES_LOAD (no reset, load): do not delete documents, but load new ones
+        # RES_LOAD_FILES (reset database and load files): load chunks from files
         # NO_RES_NO_LOAD (no reset, no load): do not delete or load documents
         if self.run_mode == "RES_LOAD":
             self.delete_documents("all")
@@ -109,22 +110,18 @@ class LongTermMemory:
         self._docs = self._load_docs_collection()
         self._chunks = self._load_chunks_collection()
 
-        # Add documents if not in NO_RES_NO_LOAD mode (no reset, no load)
-        if self.run_mode == "RES_LOAD":
-            self._ingest_folder(True)
-        elif self.run_mode == "NO_RES_LOAD":
-            self._ingest_folder(False)
-        elif self.run_mode != "NO_RES_NO_LOAD":
-            raise ValueError(f"Unsupported run mode: {self.run_mode}")
+        # Load documents and chunks from the raw data folder
+        self._ingest_folder()
 
-    def _ingest_folder(self, first_load: bool):
+    def _ingest_folder(self):
         # Define paths using configuration settings
         raw_folder = Path(Config.get("raw_data_folder"))
         processed_folder = Path(Config.get("processed_data_folder"))
         staged_folder = Path(Config.get("stage_data_folder"))
         staged_folder.mkdir(exist_ok=True)  # Ensure the staging folder exists
 
-        if first_load:
+        if self.run_mode == "RES_LOAD":
+
             # Read and generate documents from PDF files in the raw data folder
             files = [str(file) for file in raw_folder.glob("*.pdf")]
             documents = self._doc_engine.generate_documents(files, "decrees")
@@ -155,30 +152,38 @@ class LongTermMemory:
                     record_buffer = []  # Reset buffer for the next batch
                     file_count += 1  # Increment file counter
 
-            # Load chunk records from saved files, insert into database, and move processed files
-            for file_path in sorted(staged_folder.iterdir()):
-                with open(file_path, "r") as f:
-                    chunks = json.load(f)
+        if self.run_mode in ["RES_LOAD", "RES_LOAD_FILES"]:
+            # Dynamically set max_workers based on system capabilities and task type
+            max_workers = min(16, (os.cpu_count() or 1) * 4)
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                tasks = []
+                file_paths = list(sorted(staged_folder.iterdir()))
 
-                # Insert chunk records into the database
-                self._insert_chunk_records(chunks)
-                # Move the file to the processed folder after successful insertion
-                shutil.move(str(file_path), processed_folder)
-        else:
-            # Handle error recovery or continuation from previously interrupted process
-            for file_path in sorted(staged_folder.iterdir()):
-                try:
-                    with open(file_path, "r") as f:
-                        chunks = json.load(f)
+                # Submit tasks
+                for file_path in file_paths:
+                    task = executor.submit(
+                        self._process_and_move_file, file_path, processed_folder
+                    )
+                    tasks.append(task)
 
-                    # Insert chunk records and move the file if insertion is successful
-                    self._insert_chunk_records(chunks)
-                    shutil.move(str(file_path), processed_folder)
-                except Exception as e:
-                    logging.error(f"Error processing file {file_path}: {e}")
-                    # Continue to next file, allowing for partial recovery from errors
-                    continue
-        logging.info(f"Finished inserting {len(chunk_records)} chunk records.")
+                # Process results as they complete
+                for task in as_completed(tasks):
+                    try:
+                        task.result()  # This will re-raise any exception that occurred in the task
+                    except Exception as e:
+                        logging.error(f"Error during file processing: {e}")
+                        # Additional error handling can be added here if needed
+
+    def _process_and_move_file(self, file_path, processed_folder):
+        """Process a file and then move it to a processed folder."""
+        try:
+            with open(file_path, "r") as file:
+                chunks = json.load(file)
+            self._insert_chunk_records(chunks)
+            shutil.move(str(file_path), processed_folder)
+        except Exception as e:
+            logging.error(f"Failed to process and move file {file_path}: {e}")
+            raise  # Re-raise the exception to be caught by the ThreadPoolExecutor handling
 
     def _load_docs_collection(self):
         if not self._client.has_collection("docs"):

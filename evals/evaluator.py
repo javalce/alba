@@ -1,16 +1,38 @@
-import fitz  # PyMuPDF for handling PDF files
-import aiohttp  # For asynchronous HTTP requests
-import asyncio
-import json
 import os
+import json
+import fitz  # PyMuPDF for handling PDF files
+import jsonschema  # Include jsonschema for validation
+from openai import OpenAI
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_random_exponential,
+    retry_if_exception_type,
+)
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# JSON Schemas for expected responses
+JSON_SCHEMAS = {
+    "context_question_answer": {
+        "type": "object",
+        "properties": {
+            "context": {"type": "string"},
+            "question": {"type": "string"},
+            "answer": {"type": "string"},
+        },
+        "required": ["context", "question", "answer"],
+    },
+}
 
 
 class Evaluator:
-    def __init__(self, pdf_path, gpt4_endpoint, num_pages=None):
+    def __init__(self, pdf_path, num_pages=None):
         self.pdf_path = pdf_path
-        self.gpt4_endpoint = gpt4_endpoint
         self.num_pages = num_pages
-        self.headers = {"Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}"}
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def read_pdf(self):
         pages = []
@@ -24,79 +46,42 @@ class Evaluator:
             print(f"Failed to read PDF: {e}")
         return pages
 
-    async def generate_context_question_answer(self, session, page_text):
-        prompt = {
-            "model": "gpt-4-turbo",
-            "prompt": f"Generate a detailed response in JSON format containing the context, a question, and an answer based on the following text: {page_text}",
-            "max_tokens": 1024,
-            "response_format": {"type": "json_object"},
-            "temperature": 0.5,
-        }
-        async with session.post(
-            self.gpt4_endpoint, json=prompt, headers=self.headers
-        ) as response:
-            if response.status == 200:
-                return await response.json()
-            else:
-                print(f"Error with GPT-4 API: {await response.text()}")
-                return None
+    def generate_context_question_answer(self, page_text):
+        json_schema_str = json.dumps(JSON_SCHEMAS["context_question_answer"])
+        system_message = (
+            "You are a helpful assistant designed to output structured json according to the following schema: "
+            + json_schema_str
+        )
+        messages = [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": page_text},
+        ]
+        response = self.client.chat.completions.create(
+            model="gpt-4-turbo-2024-04-09",
+            messages=messages,
+            response_format={"type": "json_object"},
+        )
+        return response.choices[0].message.content
 
-    async def evaluate_responses(self, session, data):
-        if not data:
-            return {"context_had_info": 0, "answer_evaluation": 0}
-        verify_prompt = {
-            "model": "gpt-4-turbo",
-            "prompt": f"Evaluate if the context provided in '{data['context']}' contains the necessary information for the question '{data['question']}' and assess the correctness of the answer.",
-            "max_tokens": 512,
-            "response_format": {"type": "json_object"},
-            "temperature": 0.5,
-        }
-        async with session.post(
-            self.gpt4_endpoint, json=verify_prompt, headers=self.headers
-        ) as verification_response:
-            if verification_response.status == 200:
-                result = await verification_response.json()
-                context_had_info = 1 if result.get("context_had_info", False) else 0
-                answer_evaluation = (
-                    (1 if result.get("answer_correct", False) else -1)
-                    if context_had_info
-                    else 0
-                )
-                return {
-                    "context_had_info": context_had_info,
-                    "answer_evaluation": answer_evaluation,
-                }
-            else:
-                print(
-                    f"Error during verification: {await verification_response.text()}"
-                )
-                return {"context_had_info": 0, "answer_evaluation": 0}
-
-    async def run_evaluation(self):
+    def run_evaluation(self):
         pages = self.read_pdf()
-        async with aiohttp.ClientSession() as session:
-            results = [
-                await self.evaluate_responses(
-                    session, await self.generate_context_question_answer(session, page)
-                )
-                for page in pages
-                if page.strip()
-            ]
-            return results
+        results = []
+        for page in pages:
+            if page.strip():
+                response = self.generate_context_question_answer(page)
+                results.append(response)
+        return results
 
 
-# Asynchronous main function to run the evaluation
-async def main():
-    pdf_path = "path_to_your_pdf.pdf"
-    gpt4_endpoint = (
-        "https://api.openai.com/v1/chat/completions"  # Adjust with actual API endpoint
-    )
-    evaluator = Evaluator(
-        pdf_path, gpt4_endpoint, num_pages=10
-    )  # Process only the first 10 pages
-    results = await evaluator.run_evaluation()
-    print(json.dumps(results, indent=4))
+def main():
+    pdf_path = "./data/processed/decretos_N_5060_2023.pdf"
+    evaluator = Evaluator(pdf_path, num_pages=2)
+    try:
+        results = evaluator.run_evaluation()
+        print(json.dumps(results, indent=4))
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

@@ -31,8 +31,8 @@ class LongTermMemory:
         self.run_mode = Config.get("run_mode")
 
         # Define the weights for the hybrid search
-        self.DENSE_SEARCH_WEIGHT = 0.5
-        self.SPARSE_SEARCH_WEIGHT = 0.5
+        self.DENSE_SEARCH_WEIGHT = 0.25
+        self.SPARSE_SEARCH_WEIGHT = 0.75
 
         # Establish a connection to the Milvus server
         self._client = self._connect()

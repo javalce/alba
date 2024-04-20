@@ -29,6 +29,8 @@ models/
 # Data files
 *.pkl
 *.csv
+*.xls
+*.xlsx
 *.blob
 *temp.py
 

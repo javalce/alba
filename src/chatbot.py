@@ -60,4 +60,5 @@ class Chatbot:
     def _create_query(self, prompt, recent_messages):
         # This method should combine the prompt with recent chat history to create a self-contained query
         # However, for now, we will simply return the user prompt as is due to latency issues
+        # observed with local models currently (expected to be resolved in future updates)
         return prompt

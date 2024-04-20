@@ -423,7 +423,7 @@ class LongTermMemory:
                 "docs_vector": [0.0, 0.0],  # Dummy vector for the docs_vector field
             }
             records.append(record)
-        # TODO: Manage scenarios where number is None
+
         return records
 
     def _generate_chunk_records(self, chunks: List[Document]) -> List[Dict[str, any]]:

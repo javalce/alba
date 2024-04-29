@@ -3,7 +3,7 @@
     "db_url": "http://localhost:19530",
     "model_api_url": "http://localhost:11434/api/generate",
     "templates_path": "src/templates/template.json",
-    "default_inference_model": "llama2",
+    "default_inference_model": "llama3",
     "dense_embed_func_dim": 1024,
     "sparse_embed_func_path": "models/bm25_model.pkl",
     "db_collection": "rag",

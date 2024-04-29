@@ -2,10 +2,8 @@ import os
 import torch
 import shutil
 from tqdm import tqdm
-import fitz
 import pickle
 import nltk
-import uuid
 import json
 from pathlib import Path
 import logging

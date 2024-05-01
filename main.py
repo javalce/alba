@@ -1,7 +1,6 @@
 import os
 import streamlit as st
 from streamlit import session_state as ss
-from config.config import Config
 from src.chatbot import Chatbot
 
 

@@ -9,7 +9,18 @@ ner_pipeline = pipeline("ner", model=model, tokenizer=tokenizer, grouped_entitie
 
 def extract_entities(text):
     ner_results = ner_pipeline(text)
-    entities = [
-        {"text": ent["word"], "label": ent["entity_group"]} for ent in ner_results
+    entities = []
+    for ent in ner_results:
+        word = ent["word"]
+        if word.startswith("##"):
+            if entities:
+                entities[-1]["text"] += word[2:]
+        else:
+            entities.append({"text": word, "label": ent["entity_group"]})
+    # Filter out subwords and irrelevant entities
+    filtered_entities = [
+        {"text": ent["text"], "label": ent["label"]}
+        for ent in entities
+        if not ent["text"].startswith("##") and len(ent["text"].strip()) > 1
     ]
-    return entities
+    return filtered_entities

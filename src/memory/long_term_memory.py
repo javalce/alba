@@ -179,7 +179,9 @@ class LongTermMemory:
                 chunks = json.load(file)
                 for chunk in chunks:
                     entities = extract_entities(chunk["text"])
-                    chunk["entities"] = entities
+                    chunk["entities"] = [
+                        {"text": ent["text"], "label": ent["label"]} for ent in entities
+                    ]
                 insert_result = self._insert_chunk_records(chunks)
                 logging.info(f"Inserted {insert_result.insert_count} chunk records.")
                 shutil.move(str(file_path), processed_folder)
@@ -456,12 +458,16 @@ class LongTermMemory:
 
         # Prepare records with both embeddings for each chunk
         for i, chunk in enumerate(chunks):
+            entities = extract_entities(chunk.text)
             record = {
                 "id": chunk.id,
-                "dense_vector": dense_embeddings[i].tolist(),  # Dense embedding
-                "sparse_vector": sparse_embeddings[i],  # Sparse embedding
-                "parent_id": chunk.metadata.get("parent_id", 0),  # Parent document ID
-                "text": chunk.text[: Config.get("chunk_size")],  # Truncated text
+                "dense_vector": dense_embeddings[i].tolist(),
+                "sparse_vector": sparse_embeddings[i],
+                "parent_id": chunk.metadata.get("parent_id", 0),
+                "text": chunk.text[: Config.get("chunk_size")],
+                "entities": [
+                    {"text": ent["text"], "label": ent["label"]} for ent in entities
+                ],  # Include entities in chunk record
             }
             records.append(record)
 

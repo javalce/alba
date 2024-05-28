@@ -20,6 +20,7 @@ from milvus_model.sparse import BM25EmbeddingFunction
 from milvus_model.sparse.bm25.tokenizers import build_default_analyzer
 from pymilvus.orm.schema import CollectionSchema, FieldSchema
 from src.utils import setup_logging
+from src.ner_extraction import extract_entities
 
 setup_logging()
 
@@ -173,15 +174,18 @@ class LongTermMemory:
                         # Additional error handling can be added here if needed
 
     def _process_and_move_file(self, file_path, processed_folder):
-        """Process a file and then move it to a processed folder."""
         try:
             with open(file_path, "r") as file:
                 chunks = json.load(file)
-            self._insert_chunk_records(chunks)
-            shutil.move(str(file_path), processed_folder)
+                for chunk in chunks:
+                    entities = extract_entities(chunk["text"])
+                    chunk["entities"] = entities
+                insert_result = self._insert_chunk_records(chunks)
+                logging.info(f"Inserted {insert_result.insert_count} chunk records.")
+                shutil.move(str(file_path), processed_folder)
         except Exception as e:
             logging.error(f"Failed to process and move file {file_path}: {e}")
-            raise  # Re-raise the exception to be caught by the ThreadPoolExecutor handling
+            raise
 
     def _load_docs_collection(self):
         if not self._client.has_collection("docs"):
@@ -309,6 +313,9 @@ class LongTermMemory:
                     dtype=DataType.VARCHAR,
                     max_length=Config.get("chunk_size") + Config.get("chunk_overlap"),
                 ),
+                FieldSchema(
+                    name="entities", dtype=DataType.JSON
+                ),  # New field for entities
             ],
             description="Collection for storing chunk embeddings",
             enable_auto_id=False,
@@ -533,12 +540,26 @@ class LongTermMemory:
         # Convert sparse embedding from csr_matrix format to a list for insertion
         sparse_query_embedding = raw_query_sparse_embeddings.toarray().tolist()
 
+        # Extract entities from the query
+        query_entities = extract_entities(query)
+
+        # Construct dynamic filter expressions based on extracted entities
+        if query_entities:
+            filter_parts = []
+            for ent in query_entities:
+                ent_text = ent["text"].replace("%", "\\%").replace("_", "\\_")
+                filter_parts.append('json_contains(entities, "{}")'.format(ent_text))
+            filter_expr = " or ".join(filter_parts)
+        else:
+            filter_expr = ""
+
         # AnnSearchRequest for dense embeddings
         dense_search_request = AnnSearchRequest(
             data=dense_query_embedding,
             anns_field="dense_vector",
             param={"metric_type": "IP", "params": {"nprobe": 100}},
             limit=n_results,
+            expr=filter_expr,
         )
 
         # AnnSearchRequest for sparse embeddings
@@ -547,6 +568,7 @@ class LongTermMemory:
             anns_field="sparse_vector",
             param={"metric_type": "IP", "params": {"nprobe": 100}},
             limit=n_results,
+            expr=filter_expr,
         )
 
         # Step 3: Perform Hybrid Search
@@ -559,7 +581,7 @@ class LongTermMemory:
             rerank=WeightedRanker(
                 self.DENSE_SEARCH_WEIGHT, self.SPARSE_SEARCH_WEIGHT
             ),  # Reranking strategy
-            output_fields=["parent_id"],
+            output_fields=["parent_id", "entities"],
             limit=n_results,
         )
 
@@ -596,6 +618,11 @@ class LongTermMemory:
             sources_list.append(
                 f"- Decreto {doc.metadata['number']} (página {doc.metadata['page']})"
             )
+
+            # Highlight entities in the document text
+            entities = doc.metadata.get("entities", [])
+            for entity in entities:
+                context = context.replace(entity["text"], f"**{entity['text']}**")
 
         # Combine the sources into a single string prefixed with "SOURCES:"
         sources = "Fuentes consultadas:\n" + "\n".join(sources_list)

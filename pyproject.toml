@@ -19,6 +19,9 @@ tenacity = "^8.2.3"
 openai = "^1.23.1"
 pandas = "^2.2.2"
 openpyxl = "^3.1.2"
+transformers = "^4.41.1"
+spacy = "^3.7.4"
+fpdf = "^1.7.2"
 
 [build-system]
 requires = ["poetry-core"]

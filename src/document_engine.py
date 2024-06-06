@@ -1,11 +1,8 @@
 import re
-import os
-import pickle
 from tqdm import tqdm
 import fitz  # PyMuPDF
 from typing import List, Dict, Optional
 from dataclasses import dataclass, field
-import logging
 from config.config import Config
 from src.utils import setup_logging
 
@@ -48,7 +45,7 @@ class DocumentEngine:
 
         doc = Document(
             id=f"{decree_number}_{page_number}",
-            text=text,
+            text=f"Decreto Nº{decree_number}\n{text}",
             metadata={
                 "page": page_number,
                 "date": decree_date,
@@ -107,18 +104,6 @@ class DocumentEngine:
 
             pdf.close()
         return documents
-
-    def _clean_text(self, text: str) -> str:
-        placeholder = (
-            "\ue000"  # Using a Private Use Area Unicode character as a placeholder
-        )
-        text = (
-            text.replace("\n\n", placeholder)
-            .replace("\n \n", placeholder)
-            .replace("\n", " ")
-            .replace(placeholder, "\n\n")
-        )
-        return text
 
     def generate_documents(self, files, files_type) -> List[Document]:
         # Convert to list if necessary

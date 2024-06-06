@@ -1,9 +1,8 @@
 import os
-import csv
 import json
+import pandas as pd
 from tqdm import tqdm
 import fitz  # PyMuPDF for handling PDF files
-import pandas as pd
 from openai import OpenAI
 from tenacity import (
     retry,
@@ -12,7 +11,6 @@ from tenacity import (
     retry_if_exception_type,
 )
 from dotenv import load_dotenv
-
 
 # Load environment variables
 load_dotenv()
@@ -40,7 +38,7 @@ JSON_SCHEMAS = {
 
 
 class Evaluator:
-    def __init__(self, pdf_path, num_pages=None, chatbot=None):
+    def __init__(self, pdf_path=None, num_pages=None, chatbot=None):
         self.pdf_path = pdf_path
         self.num_pages = num_pages
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -66,7 +64,11 @@ class Evaluator:
     def generate_context_question_answer(self, page_text):
         json_schema_str = json.dumps(JSON_SCHEMAS["context_question_answer"])
         system_message = (
-            "You are a helpful assistant designed to read a text and create a json structure containing 1. a self-contained question in Spanish that can be answered by the text, 2. the answer in Spanish and 3. the piece of context from the text that is relevant to answer the question. The output should be in json format and match the following schema: "
+            "You are a helpful assistant. Your task is to read a text and create a JSON structure with: "
+            "1. A self-contained question in Spanish that can be answered by the text, "
+            "2. The answer in Spanish, "
+            "3. The relevant context from the text. "
+            "Ensure the output is in JSON format and matches this schema: "
             + json_schema_str
         )
         messages = [
@@ -74,7 +76,7 @@ class Evaluator:
             {"role": "user", "content": page_text},
         ]
         response = self.client.chat.completions.create(
-            model="gpt-4-turbo-2024-04-09",
+            model="gpt-4o",
             messages=messages,
             max_tokens=4096,
             temperature=0,
@@ -85,14 +87,11 @@ class Evaluator:
     def get_responses(self, c_q_a_triplets):
         responses = []
         for triplet in tqdm(c_q_a_triplets, desc="Getting Chatbot Responses"):
-            # Ensure the triplet is a dictionary
             if isinstance(triplet, str):
                 triplet = json.loads(triplet)  # Convert string to JSON (dictionary)
 
-            question = triplet.get("question")  # Now we can safely get the "question"
-            response = self.chatbot.respond_w_context(
-                question
-            )  # Process the question through the chatbot
+            question = triplet.get("question")
+            response = self.chatbot.respond_w_context(question)
             responses.append(response)
         return responses
 
@@ -106,20 +105,19 @@ class Evaluator:
         for triplet, chatbot_response in tqdm(
             zip(c_q_a_triplets, chatbot_responses), desc="Evaluating Responses"
         ):
-            # Ensure the triplet is a dictionary
             if isinstance(triplet, str):
                 triplet = json.loads(triplet)
             gpt_context = triplet["context"]
-            gpt_question = triplet["question"]  # Extract the question
+            gpt_question = triplet["question"]
             gpt_answer = triplet["answer"]
 
             json_schema_str = json.dumps(JSON_SCHEMAS["evaluation_response"])
             system_message = (
-                "Assess the chatbot's response based on the GPT model's output. Score 'has_context' as 1 if the chatbot's context "
-                "accurately reflects the same information necessary to understand the question, otherwise score as 0. "
-                "Score 'is_correct' as 1 if the chatbot's context is correct and the answer is also correct; score -1 if the "
-                "context is correct but the answer is incorrect; score 0 if the context does not adequately support the question. "
-                "Please evaluate according to this JSON schema: " + json_schema_str
+                "You are an evaluator tasked with assessing the chatbot's responses based on the GPT model's output. Please score the responses as follows: "
+                "'has_context': Assign a score of 1 if the chatbot's context accurately reflects the necessary information to understand the question, otherwise assign a score of 0. "
+                "'is_correct': Assign a score of 1 if both the context and the answer are correct; assign a score of -1 if the context is correct but the answer is incorrect; assign a score of 0 if the context does not adequately support the question. "
+                "Ensure your evaluation matches the following JSON schema: "
+                + json_schema_str
             )
             messages = [
                 {"role": "system", "content": system_message},
@@ -129,7 +127,7 @@ class Evaluator:
                 },
             ]
             eval_response = self.client.chat.completions.create(
-                model="gpt-4-turbo-2024-04-09",
+                model="gpt-4o",
                 messages=messages,
                 max_tokens=1024,
                 temperature=0,
@@ -145,11 +143,9 @@ class Evaluator:
         chatbot_responses,
         file_path="evaluation_summary.xlsx",
     ):
-        # Ensure the evaluation results are dictionaries if they are in string format
         if all(isinstance(result, str) for result in response_scores):
             response_scores = [json.loads(result) for result in response_scores]
 
-        # Prepare data for DataFrame
         data = []
         for triplet, response, eval_result in zip(
             c_q_a_triplets, chatbot_responses, response_scores
@@ -170,7 +166,6 @@ class Evaluator:
                 ]
             )
 
-        # Create a DataFrame
         df = pd.DataFrame(
             data,
             columns=[
@@ -183,7 +178,6 @@ class Evaluator:
             ],
         )
 
-        # Calculate and append summary
         total_responses = len(response_scores)
         total_has_context = sum(row[4] for row in data)
         total_correct = sum(row[5] == 1 for row in data)
@@ -213,51 +207,32 @@ class Evaluator:
             ],
         )
 
-        # Write DataFrames to Excel
         with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
             df.to_excel(writer, sheet_name="Detailed Responses", index=False)
             summary_df.to_excel(writer, sheet_name="Summary", index=False)
 
     def save_triplets(self, c_q_a_triplets, file_path="triplets.xlsx"):
-        # First, we need to unpack the JSON into separate columns
-        # Initialize lists to hold the unpacked data
         contexts = []
         questions = []
         answers = []
 
-        # Unpack each triplet
         for triplet in c_q_a_triplets:
-            # Convert string to JSON (dictionary) if it's not already
             if isinstance(triplet, str):
                 triplet = json.loads(triplet)
 
-            # Append data to lists
             contexts.append(triplet.get("context", ""))
             questions.append(triplet.get("question", ""))
             answers.append(triplet.get("answer", ""))
 
-        # Create a DataFrame using the unpacked data
         df = pd.DataFrame(
             {"Context": contexts, "Question": questions, "Answer": answers}
         )
 
-        # Save DataFrame to an Excel file
         df.to_excel(file_path, index=False)
 
-    def run_evaluation(self):
-        pages = self.read_pdf()
+    def load_triplets(self, file_path="triplets.xlsx"):
+        df_triplets = pd.read_excel(file_path)
         c_q_a_triplets = []
-        for page in tqdm(pages, desc="Generating C-Q-A Triplets"):
-            if page.strip():
-                triplet = self.generate_context_question_answer(page)
-                c_q_a_triplets.append(triplet)
-
-        # Save the triplets to an Excel file
-        self.save_triplets(c_q_a_triplets, "triplets.xlsx")
-
-        # Now read the triplets from the Excel file to proceed
-        c_q_a_triplets = []
-        df_triplets = pd.read_excel("triplets.xlsx")
         for _, row in df_triplets.iterrows():
             c_q_a_triplets.append(
                 {
@@ -266,14 +241,31 @@ class Evaluator:
                     "answer": row["Answer"],
                 }
             )
+        return c_q_a_triplets
 
-        # Get responses from the chatbot
+    def evaluate_existing_triplets(self, triplets_file_path="triplets.xlsx"):
+        c_q_a_triplets = self.load_triplets(triplets_file_path)
         chatbot_responses = self.get_responses(c_q_a_triplets)
-
-        # Evaluate responses
         response_scores = self.evaluate_responses(c_q_a_triplets, chatbot_responses)
-
-        # Save the final scores
         self.save_scores(response_scores, c_q_a_triplets, chatbot_responses)
-
         return response_scores
+
+    def run_evaluation(
+        self, use_existing_triplets=False, triplets_file_path="triplets.xlsx"
+    ):
+        if use_existing_triplets and os.path.exists(triplets_file_path):
+            return self.evaluate_existing_triplets(triplets_file_path)
+        else:
+            pages = self.read_pdf()
+            c_q_a_triplets = []
+            for page in tqdm(pages, desc="Generating C-Q-A Triplets"):
+                if page.strip():
+                    triplet = self.generate_context_question_answer(page)
+                    c_q_a_triplets.append(triplet)
+
+            self.save_triplets(c_q_a_triplets, triplets_file_path)
+
+            chatbot_responses = self.get_responses(c_q_a_triplets)
+            response_scores = self.evaluate_responses(c_q_a_triplets, chatbot_responses)
+            self.save_scores(response_scores, c_q_a_triplets, chatbot_responses)
+            return response_scores

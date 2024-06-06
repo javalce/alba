@@ -22,6 +22,7 @@ openpyxl = "^3.1.2"
 transformers = "^4.41.1"
 spacy = "^3.7.4"
 fpdf = "^1.7.2"
+pypdf2 = "^3.0.1"
 
 [build-system]
 requires = ["poetry-core"]

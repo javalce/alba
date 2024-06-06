@@ -1,24 +1,32 @@
-import json
+import pandas as pd
+from config.config import Config
+from src.templates.template_manager import TemplateManager
+from src.memory.long_term_memory import LongTermMemory
+from src.memory.short_term_memory import ShortTermMemory
+from src.response_engine import ResponseEngine
 from src.chatbot import Chatbot
-from evals.evaluator import Evaluator
 
+# Load the Excel file
+df = pd.read_excel("evaluation_triplets.xlsx")  # Adjust the file path if necessary
 
-def main():
-    # Path to the PDF file
-    pdf_path = "data/raw/decretos_N_5060_2023.pdf"
+# Initialize the chatbot
+chatbot = Chatbot()
 
-    # Initialize the Chatbot
-    chatbot = Chatbot()
+# Iterate through each question in the DataFrame
+for index, row in df.iterrows():
+    question = row["Question"]  # Adjust the column name if necessary
+    context = row["Context"]  # Adjust the column name if necessary
 
-    # Initialize the Evaluator with the PDF path, number of pages to read, and chatbot instance
-    evaluator = Evaluator(pdf_path, num_pages=25, chatbot=chatbot)
+    # Get the response and context from the chatbot
+    response_n_context = chatbot.respond_w_context(question)
 
-    # Run the evaluation and get the results
-    results = evaluator.run_evaluation()
+    # Parse the response and context
+    response, context = response_n_context.split("\n\nCONTEXT: ")
+    response = response.replace("RESPONSE: ", "")
 
-    # Print the results as a formatted JSON string
-    print(json.dumps(results, indent=4))
+    # Append the response and context to the DataFrame
+    df.at[index, "Answer"] = response
+    df.at[index, "Chatbot Context"] = context
 
-
-if __name__ == "__main__":
-    main()
+# Save the updated DataFrame to a new Excel file
+df.to_excel("updated_responses.xlsx", index=False)

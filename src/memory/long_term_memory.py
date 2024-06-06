@@ -9,6 +9,7 @@ from pathlib import Path
 import logging
 from pathlib import Path
 from typing import List, Optional, Dict
+from openpyxl import Workbook, load_workbook
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from config.config import Config
 from src.document_engine import Document, DocumentEngine
@@ -30,8 +31,8 @@ class LongTermMemory:
         self.run_mode = Config.get("run_mode")
 
         # Define the weights for the hybrid search
-        self.DENSE_SEARCH_WEIGHT = 0.25
-        self.SPARSE_SEARCH_WEIGHT = 0.75
+        self.DENSE_SEARCH_WEIGHT = 0.1
+        self.SPARSE_SEARCH_WEIGHT = 0.9
 
         # Establish a connection to the Milvus server
         self._client = self._connect()
@@ -93,6 +94,9 @@ class LongTermMemory:
                 model_name="BAAI/bge-m3",  # Especifica el nombre del modelo
                 device=device,  # Usa el dispositivo determinado (CPU o GPU)
                 use_fp16=use_fp16,  # Usa FP16 si está en CUDA, de lo contrario False
+                return_colbert_vecs=False,  # No se necesitan vectores de salida de COLBERT
+                return_dense=True,  # Vectores densos para búsqueda semántica
+                return_sparse=False,  # Los dispersos los tomaremos de bm25
             )
             return bgeM3_ef
         else:
@@ -100,7 +104,7 @@ class LongTermMemory:
 
     def _load_collections(self):
         # RES_LOAD (reset and load): delete all documents and load new ones
-        # RES_LOAD_FILES (reset database and load files): load chunks from files
+        # RES_LOAD_FILES (reset database and load files): load chunks from files; used to recover from errors
         # NO_RES_NO_LOAD (no reset, no load): do not delete or load documents
         if self.run_mode == "RES_LOAD":
             self.delete_documents("all")
@@ -115,12 +119,8 @@ class LongTermMemory:
     def _ingest_folder(self):
         # Define paths using configuration settings
         raw_folder = Path(Config.get("raw_data_folder"))
-        processed_folder = Path(Config.get("processed_data_folder"))
-        staged_folder = Path(Config.get("stage_data_folder"))
-        staged_folder.mkdir(exist_ok=True)  # Ensure the staging folder exists
 
         if self.run_mode == "RES_LOAD":
-
             # Read and generate documents from PDF files in the raw data folder
             files = [str(file) for file in raw_folder.glob("*.pdf")]
             documents = self._doc_engine.generate_documents(files, "decrees")
@@ -130,64 +130,23 @@ class LongTermMemory:
             self._client.insert(collection_name="docs", data=doc_records)
             logging.info(f"Finished inserting {len(doc_records)} document records.")
 
-            # Generate chunk records from the documents
-            chunks = self._doc_engine._chunk_documents(documents)
-            chunk_records = self._generate_chunk_records(chunks)
+            self._process_and_insert_chunks(documents)
 
-            # When loading a full folder, save chunk records to JSON files in the staging folder
-            # to avoid memory issues when inserting a large number of records;
-            # this also allows for partial recovery from errors
-            record_buffer = []
-            file_count = 0  # To keep track of file naming
+    def _process_documents(self, documents):
+        chunk_records = []
+        chunks = self._doc_engine._chunk_documents(documents)
 
-            # Batch and save chunk records to JSON files in the staging folder
-            for i, record in enumerate(chunk_records):
-                record_buffer.append(record)
-                # Write to file either when the buffer size reaches 100 or at the end of the list
-                if len(record_buffer) >= 100 or i == len(chunk_records) - 1:
-                    file_path = staged_folder / f"chunks_{file_count}.json"
-                    with open(file_path, "w") as f:
-                        json.dump(record_buffer, f)
-                    record_buffer = []  # Reset buffer for the next batch
-                    file_count += 1  # Increment file counter
+        # Generate chunk records including embeddings
+        chunk_records.extend(self._generate_chunk_records(chunks))
 
-        if self.run_mode in ["RES_LOAD", "RES_LOAD_FILES"]:
-            # Dynamically set max_workers based on system capabilities and task type
-            max_workers = min(16, (os.cpu_count() or 1) * 4)
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                tasks = []
-                file_paths = list(sorted(staged_folder.iterdir()))
+        return chunk_records
 
-                # Submit tasks
-                for file_path in file_paths:
-                    task = executor.submit(
-                        self._process_and_move_file, file_path, processed_folder
-                    )
-                    tasks.append(task)
-
-                # Process results as they complete
-                for task in as_completed(tasks):
-                    try:
-                        task.result()  # This will re-raise any exception that occurred in the task
-                    except Exception as e:
-                        logging.error(f"Error during file processing: {e}")
-                        # Additional error handling can be added here if needed
-
-    def _process_and_move_file(self, file_path, processed_folder):
-        try:
-            with open(file_path, "r") as file:
-                chunks = json.load(file)
-                for chunk in chunks:
-                    entities = extract_entities(chunk["text"])
-                    chunk["entities"] = [
-                        {"text": ent["text"], "label": ent["label"]} for ent in entities
-                    ]
-                insert_result = self._insert_chunk_records(chunks)
-                logging.info(f"Inserted {insert_result.insert_count} chunk records.")
-                shutil.move(str(file_path), processed_folder)
-        except Exception as e:
-            logging.error(f"Failed to process and move file {file_path}: {e}")
-            raise
+    def _insert_chunk_records(self, chunk_records):
+        """
+        Batch load chunk records, including embeddings, into the _chunks collection.
+        """
+        self._chunks.insert(chunk_records)
+        logging.info(f"Inserted {len(chunk_records)} chunk records.")
 
     def _load_docs_collection(self):
         if not self._client.has_collection("docs"):
@@ -298,7 +257,7 @@ class LongTermMemory:
                 FieldSchema(
                     name="dense_vector",
                     dtype=DataType.FLOAT_VECTOR,
-                    dim=self._dense_ef.dim["colbert_vecs"],
+                    dim=self._dense_ef.dim["dense"],
                 ),
                 FieldSchema(
                     name="sparse_vector",
@@ -313,11 +272,9 @@ class LongTermMemory:
                 FieldSchema(
                     name="text",
                     dtype=DataType.VARCHAR,
-                    max_length=Config.get("chunk_size") + Config.get("chunk_overlap"),
+                    max_length=Config.get("chunk_text_size"),
                 ),
-                FieldSchema(
-                    name="entities", dtype=DataType.JSON
-                ),  # New field for entities
+                FieldSchema(name="entities", dtype=DataType.JSON),
             ],
             description="Collection for storing chunk embeddings",
             enable_auto_id=False,
@@ -363,13 +320,13 @@ class LongTermMemory:
 
         # Adjust total batches based on the new start_from parameter
         adjusted_docs = documents[start_from:]
-        total_batches = len(adjusted_docs) // batch_size + (
+        num_batches = len(adjusted_docs) // batch_size + (
             1 if len(adjusted_docs) % batch_size > 0 else 0
         )
 
         # Process documents in batches starting from start_from
         for i in tqdm(
-            range(total_batches), desc="Processing and inserting document chunks"
+            range(num_batches), desc="Processing and inserting document chunks"
         ):
             # Adjust batch slice indices based on start_from
             start_idx = start_from + i * batch_size
@@ -389,7 +346,7 @@ class LongTermMemory:
                 logging.error(
                     f"Error processing documents. Next start_from should be: {next_start_from}. Error: {e}"
                 )
-                raise  # Rethrow the exception or handle it as you see fit
+                raise  # Re-raise the error to stop the process
 
         logging.info("Completed processing and inserting chunks.")
 
@@ -409,7 +366,6 @@ class LongTermMemory:
 
         # Insert chunk records into the database
         self._insert_chunk_records(chunk_records)
-        logging.info(f"Processed and inserted {len(chunk_records[0])} chunk records.")
 
     def _generate_doc_records(self, documents: List[Document]) -> List[Dict[str, any]]:
         records = []
@@ -457,7 +413,7 @@ class LongTermMemory:
         ]
 
         # Prepare records with both embeddings for each chunk
-        for i, chunk in enumerate(chunks):
+        for i, chunk in tqdm(enumerate(chunks), desc="Generating chunk records"):
             entities = extract_entities(chunk.text)
             record = {
                 "id": chunk.id,
@@ -465,9 +421,7 @@ class LongTermMemory:
                 "sparse_vector": sparse_embeddings[i],
                 "parent_id": chunk.metadata.get("parent_id", 0),
                 "text": chunk.text[: Config.get("chunk_size")],
-                "entities": [
-                    {"text": ent["text"], "label": ent["label"]} for ent in entities
-                ],  # Include entities in chunk record
+                "entities": entities,
             }
             records.append(record)
 
@@ -494,15 +448,15 @@ class LongTermMemory:
         }
 
         # Insert the formatted records into the _docs collection.
-        insert_result = self._docs.insert(data_to_insert)
-        logging.info(f"Inserted {insert_result.insert_count} document records.")
+        self._docs.insert(data_to_insert)
+        logging.info(f"Inserted {len(doc_records)} document records.")
 
     def _insert_chunk_records(self, chunk_records):
         """
         Batch load chunk records, including embeddings, into the _chunks collection.
         """
-        insert_result = self._chunks.insert(chunk_records)
-        logging.info(f"Inserted {insert_result.insert_count} chunk records.")
+        self._chunks.insert(chunk_records)
+        logging.info(f"Inserted {len(chunk_records)} chunk records.")
 
     def get_context(self, query: str, n_docs=2) -> List[Document]:
         """
@@ -546,26 +500,12 @@ class LongTermMemory:
         # Convert sparse embedding from csr_matrix format to a list for insertion
         sparse_query_embedding = raw_query_sparse_embeddings.toarray().tolist()
 
-        # Extract entities from the query
-        query_entities = extract_entities(query)
-
-        # Construct dynamic filter expressions based on extracted entities
-        if query_entities:
-            filter_parts = []
-            for ent in query_entities:
-                ent_text = ent["text"].replace("%", "\\%").replace("_", "\\_")
-                filter_parts.append('json_contains(entities, "{}")'.format(ent_text))
-            filter_expr = " or ".join(filter_parts)
-        else:
-            filter_expr = ""
-
         # AnnSearchRequest for dense embeddings
         dense_search_request = AnnSearchRequest(
             data=dense_query_embedding,
             anns_field="dense_vector",
             param={"metric_type": "IP", "params": {"nprobe": 100}},
             limit=n_results,
-            expr=filter_expr,
         )
 
         # AnnSearchRequest for sparse embeddings
@@ -574,22 +514,40 @@ class LongTermMemory:
             anns_field="sparse_vector",
             param={"metric_type": "IP", "params": {"nprobe": 100}},
             limit=n_results,
-            expr=filter_expr,
         )
 
-        # Step 3: Perform Hybrid Search
-        # Execute hybrid_search using the prepared search requests and a reranking strategy
-        response = self._chunks.hybrid_search(
-            reqs=[
-                dense_search_request,
-                sparse_search_request,
-            ],  # List of search requests
-            rerank=WeightedRanker(
-                self.DENSE_SEARCH_WEIGHT, self.SPARSE_SEARCH_WEIGHT
-            ),  # Reranking strategy
-            output_fields=["parent_id", "entities"],
-            limit=n_results,
-        )
+        extracted_entities = extract_entities(query)
+        entity_texts = [ent["text"] for ent in extracted_entities]
+        sanitized_texts = [text.replace('"', '\\"') for text in entity_texts]
+        filter_texts = '", "'.join(sanitized_texts)
+        dynamic_filter = f'JSON_CONTAINS_ANY(entities["text"], ["{filter_texts}"])'
+
+        # Perform Hybrid Search
+        if extracted_entities:
+            response = self._chunks.hybrid_search(
+                reqs=[
+                    dense_search_request,
+                    sparse_search_request,
+                ],
+                rerank=WeightedRanker(
+                    self.DENSE_SEARCH_WEIGHT, self.SPARSE_SEARCH_WEIGHT
+                ),
+                output_fields=["parent_id", "entities"],
+                limit=n_results,
+                filter=dynamic_filter,
+            )
+        else:
+            response = self._chunks.hybrid_search(
+                reqs=[
+                    dense_search_request,
+                    sparse_search_request,
+                ],
+                rerank=WeightedRanker(
+                    self.DENSE_SEARCH_WEIGHT, self.SPARSE_SEARCH_WEIGHT
+                ),
+                output_fields=["parent_id"],
+                limit=n_results,
+            )
 
         return response[0]
 
@@ -624,11 +582,6 @@ class LongTermMemory:
             sources_list.append(
                 f"- Decreto {doc.metadata['number']} (página {doc.metadata['page']})"
             )
-
-            # Highlight entities in the document text
-            entities = doc.metadata.get("entities", [])
-            for entity in entities:
-                context = context.replace(entity["text"], f"**{entity['text']}**")
 
         # Combine the sources into a single string prefixed with "SOURCES:"
         sources = "Fuentes consultadas:\n" + "\n".join(sources_list)

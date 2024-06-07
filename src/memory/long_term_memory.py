@@ -9,8 +9,6 @@ from pathlib import Path
 import logging
 from pathlib import Path
 from typing import List, Optional, Dict
-from openpyxl import Workbook, load_workbook
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from config.config import Config
 from src.document_engine import Document, DocumentEngine
 from pymilvus import connections
@@ -20,8 +18,8 @@ from milvus_model.hybrid import BGEM3EmbeddingFunction
 from milvus_model.sparse import BM25EmbeddingFunction
 from milvus_model.sparse.bm25.tokenizers import build_default_analyzer
 from pymilvus.orm.schema import CollectionSchema, FieldSchema
-from src.utils import setup_logging
-from src.ner_extraction import extract_entities
+from src.utils.utils import setup_logging
+from src.utils.ner_extraction import extract_entities
 
 setup_logging()
 
@@ -536,7 +534,7 @@ class LongTermMemory:
                 limit=n_results,
                 filter=dynamic_filter,
             )
-        else:
+        if not extracted_entities or response[0].num == 0:
             response = self._chunks.hybrid_search(
                 reqs=[
                     dense_search_request,

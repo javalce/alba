@@ -4,7 +4,7 @@ import fitz  # PyMuPDF
 from typing import List, Dict, Optional
 from dataclasses import dataclass, field
 from config.config import Config
-from src.utils import setup_logging
+from src.utils.utils import setup_logging
 
 setup_logging()
 

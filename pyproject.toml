@@ -23,6 +23,9 @@ transformers = "^4.41.1"
 spacy = "^3.7.4"
 fpdf = "^1.7.2"
 pypdf2 = "^3.0.1"
+camelot-py = "^0.11.0"
+opencv-python = "^4.10.0.82"
+ghostscript = "^0.7"
 
 [build-system]
 requires = ["poetry-core"]

@@ -1,38 +1,48 @@
+from typing import Union
+
+
 class ShortTermMemory:
+    """
+    A class representing short-term memory for storing chat messages.
+    """
+
     def __init__(self):
-        self.messages = []  # A list to store chat messages
-
-    def add_message(self, message):
         """
-        Adds a message to the conversation history.
+        Initialize the ShortTermMemory object with an empty list of messages.
+        """
+        self.messages = []
 
-        Parameters:
-        - message (dict): A message object containing role and content keys.
+    def add_message(self, message: dict) -> None:
+        """
+        Add a message to the conversation history.
+
+        Args:
+            message (dict): A message object containing 'role' and 'content' keys.
         """
         self.messages.append(message)
 
-    def recall_messages(self, limit=None, to_str=False):
+    def recall_messages(
+        self, limit: int = None, to_str: bool = False
+    ) -> Union[list, str]:
         """
-        Retrieves the conversation history.
+        Retrieve the conversation history.
 
-        Parameters:
-        - limit (int): Optional parameter to specify the number of recent messages to retrieve.
+        Args:
+            limit (int, optional): The number of recent messages to retrieve. If None, retrieve all messages.
+            to_str (bool, optional): If True, return the messages as a formatted string. If False, return a list of message objects.
 
         Returns:
-        - list: A list of message objects.
+            Union[list, str]: A list of message objects or a formatted string of the most recent messages.
         """
-        # if to_str is True, return a string of the most recent messages (both role and content)
         if to_str:
             recent_messages = self.recall_messages(limit=limit)
             return "\n".join(
                 [f"{msg['role']}: {msg['content']}" for msg in recent_messages]
             )
-
-        # Otherwise, return a list of message objects
         return self.messages[-limit:] if limit else self.messages
 
-    def forget_messages(self):
+    def forget_messages(self) -> None:
         """
-        Clears the conversation history.
+        Clear the conversation history.
         """
         self.messages.clear()

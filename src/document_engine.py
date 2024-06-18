@@ -1,8 +1,13 @@
+# Standard library imports
 import re
-from tqdm import tqdm
-import fitz  # PyMuPDF
-from typing import List, Dict, Optional
 from dataclasses import dataclass, field
+from typing import List
+
+# Third-party imports
+import fitz  # PyMuPDF
+from tqdm import tqdm
+
+# Local application imports
 from config.config import Config
 from src.utils.utils import setup_logging
 
@@ -11,13 +16,35 @@ setup_logging()
 
 @dataclass
 class Document:
+    """
+    A dataclass representing a document.
+
+    Attributes:
+        id (str): The unique identifier of the document.
+        text (str): The text content of the document.
+        metadata (dict): Additional metadata associated with the document.
+    """
+
     id: str
     text: str = ""
     metadata: dict = field(default_factory=dict)
 
 
 class DocumentEngine:
+    """
+    A class for processing and generating documents from various file types.
+    """
+
     def _identify_decree_type(self, text: str) -> str:
+        """
+        Identify the type of decree based on the text content.
+
+        Args:
+            text (str): The text content of the decree.
+
+        Returns:
+            str: The type of decree ('SEPEI' or 'standard').
+        """
         if "servicio provincial de extinción de incendios" in text.lower():
             return "SEPEI"
         else:
@@ -31,6 +58,19 @@ class DocumentEngine:
         decree_date: str,
         multi_page_decree: bool,
     ) -> Document:
+        """
+        Parse a standard decree and create a Document object.
+
+        Args:
+            text (str): The text content of the decree.
+            page_number (int): The page number of the decree.
+            decree_number (str): The decree number.
+            decree_date (str): The decree date.
+            multi_page_decree (bool): Indicates if the decree spans multiple pages.
+
+        Returns:
+            Document: The parsed standard decree as a Document object.
+        """
         if multi_page_decree:
             text_start = 0  # Start from the beginning of the text
         else:
@@ -58,6 +98,18 @@ class DocumentEngine:
     def _parse_SEPEI_decree(
         self, text: str, page_number: int, decree_number: str, decree_date: str
     ) -> Document:
+        """
+        Parse a SEPEI decree and create a Document object.
+
+        Args:
+            text (str): The text content of the decree.
+            page_number (int): The page number of the decree.
+            decree_number (str): The decree number.
+            decree_date (str): The decree date.
+
+        Returns:
+            Document: The parsed SEPEI decree as a Document object.
+        """
         doc = Document(
             id=f"{decree_number}_{page_number}",
             text=text.strip(),
@@ -72,6 +124,15 @@ class DocumentEngine:
         return doc
 
     def _docs_from_decree_files(self, files: List[str]) -> List[Document]:
+        """
+        Generate a list of Document objects from decree files.
+
+        Args:
+            files (List[str]): A list of file paths to decree files.
+
+        Returns:
+            List[Document]: A list of Document objects generated from the decree files.
+        """
         documents = []
         decree_number_n_date_pattern = re.compile(
             r"Decreto Nº(\d+) de (\d{2}/\d{2}/\d{4})", re.DOTALL
@@ -106,6 +167,19 @@ class DocumentEngine:
         return documents
 
     def generate_documents(self, files, files_type) -> List[Document]:
+        """
+        Generate a list of Document objects from the given files.
+
+        Args:
+            files: A single file path or a list of file paths.
+            files_type: The type of files being processed.
+
+        Returns:
+            List[Document]: A list of Document objects generated from the files.
+
+        Raises:
+            ValueError: If the file type is unsupported.
+        """
         # Convert to list if necessary
         if not isinstance(files, list):
             files = [files]
@@ -120,6 +194,15 @@ class DocumentEngine:
         return documents
 
     def _clean_text(self, text: str) -> str:
+        """
+        Clean the text by replacing newline characters and multiple spaces.
+
+        Args:
+            text (str): The input text to be cleaned.
+
+        Returns:
+            str: The cleaned text.
+        """
         # Use a temporary placeholder for "\n\n"
         placeholder = (
             "\ue000"  # Using a Private Use Area Unicode character as a placeholder
@@ -137,6 +220,15 @@ class DocumentEngine:
         return text
 
     def _chunk_documents(self, documents):
+        """
+        Split the documents into chunks of a specified size with overlap.
+
+        Args:
+            documents: A list of Document objects to be chunked.
+
+        Returns:
+            A list of chunked Document objects.
+        """
         chunk_size = Config.get("chunk_size")
         overlap = Config.get("chunk_overlap")
 

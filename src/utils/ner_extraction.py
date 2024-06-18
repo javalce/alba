@@ -1,25 +1,41 @@
-import json
+# Standard library imports
 import re
+import json
+from typing import List, Tuple
+
+# Third-party imports
 import spacy
 from spacy.matcher import PhraseMatcher
-from typing import List, Tuple
+
+# Local application imports
 from config.config import Config
 
 
 class EntityExtractor:
+    """
+    A class for extracting entities from text using spaCy and regular expressions.
+    """
+
     def __init__(self, locations_file: str):
-        # Cargar modelo de spaCy
+        """
+        Initialize the EntityExtractor with a spaCy model, location matcher, and regex patterns.
+
+        Args:
+            locations_file (str): Path to the JSON file containing location data.
+        """
+        # Load spaCy model
         false_positives_file = Config().get("false_positives_file")
         self.nlp = spacy.load("es_core_news_lg")
 
-        # Inicializar PhraseMatcher
+        # Initialize PhraseMatcher
         self.location_matcher = PhraseMatcher(self.nlp.vocab)
 
-        # Definir patrones de expresiones regulares
+        # Define regex patterns
         self.law_patterns = [
             re.compile(
                 r"(?i)(?:p\.d\.|r\.d\.|real decreto legislativo|decreto presidencial|real decreto|decreto|ley|art\.|p\.a\.|proceso administrativo|proceso\s*administrativo)\s*(?:nº|número)?\s*(\d+/\d+|\d+)"
-            )
+            ),
+            re.compile(r"\b(\d{1,5}/\d{1,5})\b"),
         ]
 
         self.id_patterns = [
@@ -27,24 +43,30 @@ class EntityExtractor:
             re.compile(r"\b(cif|nif)[:\s]*?([a-zA-Z]\d{8})\b", re.IGNORECASE),
             re.compile(
                 r"\bSEGEX[:\s]*?(\d+)\b", re.IGNORECASE
-            ),  # Patrón para números de contrato después de "SEGEX" o "SEGEX:"
+            ),  # Pattern for contract numbers after "SEGEX" or "SEGEX:"
             re.compile(
                 r"\b([A-Z]-\d{2}-\d{3}-\d{4})\b", re.IGNORECASE
-            ),  # Patrón para códigos de trabajo en el formato "F-21-421-0060"
+            ),  # Pattern for job codes in the format "F-21-421-0060"
         ]
 
-        # Cargar y configurar ubicaciones
+        # Load and configure locations
         self.load_locations(locations_file)
 
-        # Cargar false positives
+        # Load false positives
         self.false_positives = self.load_false_positives(false_positives_file)
 
     def load_locations(self, locations_file: str):
-        # Cargar ubicaciones desde el archivo JSON
+        """
+        Load locations from the JSON file and add them to the location matcher.
+
+        Args:
+            locations_file (str): Path to the JSON file containing location data.
+        """
+        # Load locations from the JSON file
         with open(locations_file, "r", encoding="utf-8") as f:
             locations_data = json.load(f)
 
-        # Combina todas las ubicaciones en una lista
+        # Combine all locations into a list
         locations = []
         if "municipios" in locations_data:
             locations.extend(locations_data["municipios"])
@@ -55,29 +77,62 @@ class EntityExtractor:
 
         location_patterns = [self.nlp(loc.lower()) for loc in locations]
 
-        # Añadir patrones al PhraseMatcher
+        # Add patterns to the PhraseMatcher
         self.location_matcher.add("LOC", None, *location_patterns)
 
     def load_false_positives(self, false_positives_file: str) -> set:
-        # Cargar false positives desde el archivo
+        """
+        Load false positives from the file and return them as a set.
+
+        Args:
+            false_positives_file (str): Path to the file containing false positives.
+
+        Returns:
+            set: A set of false positive strings.
+        """
+        # Load false positives from the file
         with open(false_positives_file, "r", encoding="utf-8") as f:
             false_positives = {line.strip().lower() for line in f}
         return false_positives
 
     def clean_text(self, text: str) -> str:
+        """
+        Clean the text by removing newline characters and multiple spaces.
+
+        Args:
+            text (str): The input text to be cleaned.
+
+        Returns:
+            str: The cleaned text.
+        """
         # Remove newline characters and multiple spaces
         text = text.replace("\n", " ").replace("\r", " ")
         text = re.sub(r"\s+", " ", text).strip()
+        # Remove question and exclamation marks
+        text = text.replace("?", "").replace("!", "").replace("¿", "").replace("¡", "")
+        # Remove leading and trailing punctuation
+        text = text.strip(".,;:¡!¿?()[]{}")
+        # Remove leading and trailing whitespace and hyphens
+        text = text.strip().strip("-")
+        # Remove Don, Doña, Sr., Sra., Dr., Dra., D., Da., Dª., etc.
+        text = re.sub(r"\b(Don|Doña|Sr\.|Sra\.|Dr\.|Dra\.|D\.|Da\.|Dª\.)\s+", "", text)
         return text
 
     def extract_entities(self, text: str) -> List[Tuple[str, str]]:
-        # Remove question and exclamation marks
-        text = text.replace("?", "").replace("!", "").replace("¿", "").replace("¡", "")
+        """
+        Extract entities from the given text using spaCy and regex patterns.
 
-        # Procesar el texto con spaCy
+        Args:
+            text (str): The input text to extract entities from.
+
+        Returns:
+            List[Tuple[str, str]]: A list of extracted entities, each represented as a tuple of (entity_type, entity_text).
+        """
+
+        # Process the text with spaCy
         doc = self.nlp(text)
 
-        # Extraer entidades "ID" con expresiones regulares y marcarlas para removerlas
+        # Extract "ID" entities using regex patterns and mark them for removal
         id_entities = []
         for pattern in self.id_patterns:
             matches = pattern.finditer(doc.text)
@@ -91,7 +146,7 @@ class EntityExtractor:
 
         entities = id_entities
 
-        # Extraer entidades "PER"
+        # Extract "PER" entities
         persons = [
             (ent.label_, self.clean_text(ent.text))
             for ent in doc.ents
@@ -109,7 +164,7 @@ class EntityExtractor:
         unique_persons = list(set(persons))
         entities.extend([("PER", person) for _, person in unique_persons])
 
-        # Extraer entidades "LOC" usando spaCy y PhraseMatcher
+        # Extract "LOC" entities using spaCy and PhraseMatcher
         locations = [
             (ent.label_, self.clean_text(ent.text))
             for ent in doc.ents
@@ -134,7 +189,7 @@ class EntityExtractor:
         unique_locations = list(set(locations))
         entities.extend(unique_locations)
 
-        # Extraer entidades "LAW" con expresiones regulares
+        # Extract "LAW" entities using regex patterns
         laws = []
         for pattern in self.law_patterns:
             matches = pattern.finditer(doc.text)
@@ -142,5 +197,4 @@ class EntityExtractor:
         unique_laws = list(set(laws))
         entities.extend(unique_laws)
 
-        # Devolver todas las entidades extraídas
         return entities

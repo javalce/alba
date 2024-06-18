@@ -1,39 +1,50 @@
+# Standard library imports
 from typing import Any
+
+# Third-party imports
 from ollama import chat
+
+# Local application imports
 from config.config import Config
 from src.templates.template_manager import TemplateManager
 
 
 class ResponseEngine:
+    """
+    A class for generating responses using a specified model or strategy.
+    """
+
     def __init__(self, model_name: str) -> None:
         """
-        Initializes the response engine with a specific model type.
+        Initialize the response engine with a specific model type.
 
-        Parameters:
-        - model_name (str): Identifier for the type of model or response generation strategy to use.
+        Args:
+            model_name (str): Identifier for the type of model or response generation strategy to use.
         """
         self._model = model_name
 
     def _load_model(self, model_name: str) -> Any:
         """
-        Loads a model based on the specified model type.
+        Load a model based on the specified model type.
 
-        Parameters:
-        - model_name (str): The type of model to load.
+        Args:
+            model_name (str): The type of model to load.
+
+        Returns:
+            Any: The loaded model.
         """
         self._model = model_name
 
     def generate_response(self, llm_prompt: str) -> str:
         """
-        Generates a response based on the enriched query (llm_prompt) using the loaded model or strategy.
+        Generate a response based on the enriched query (llm_prompt) using the loaded model or strategy.
 
-        Parameters:
-        - llm_prompt (str): The enriched query that combines the user prompt with context from recent messages and long-term memory.
+        Args:
+            llm_prompt (str): The enriched query that combines the user prompt with context from recent messages and long-term memory.
 
         Returns:
-        - str: The generated response.
+            str: The generated response.
         """
-
         messages = [
             {
                 "role": "system",

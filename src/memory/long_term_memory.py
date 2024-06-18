@@ -1,25 +1,31 @@
+# Standard library imports
 import os
 import json
-import torch
-from tqdm import tqdm
 import pickle
-import nltk
-from pathlib import Path
 import logging
 from pathlib import Path
-from typing import List, Optional, Dict
-from config.config import Config
-from src.document_engine import Document, DocumentEngine
-from pymilvus import connections
-from pymilvus import MilvusClient, DataType, Collection
-from pymilvus.client.abstract import AnnSearchRequest, WeightedRanker, SearchResult
-from milvus_model.hybrid import BGEM3EmbeddingFunction
+from typing import Dict, List, Optional
+
+# Third-party library imports
+import nltk
+import torch
+from tqdm import tqdm
+
 from milvus_model.sparse import BM25EmbeddingFunction
+from milvus_model.hybrid import BGEM3EmbeddingFunction
 from milvus_model.sparse.bm25.tokenizers import build_default_analyzer
+
 from pymilvus.orm.schema import CollectionSchema, FieldSchema
+from pymilvus import Collection, DataType, MilvusClient, connections
+from pymilvus.client.abstract import AnnSearchRequest, SearchResult, WeightedRanker
+
+# Local application imports
+from config.config import Config
 from src.utils.utils import setup_logging
 from src.utils.ner_extraction import EntityExtractor
+from src.document_engine import Document, DocumentEngine
 
+# Setup logging
 setup_logging()
 
 
@@ -517,7 +523,7 @@ class LongTermMemory:
         dense_search_request = AnnSearchRequest(
             data=dense_query_embedding,
             anns_field="dense_vector",
-            param={"metric_type": "IP", "params": {"nprobe": 100}},
+            param={"metric_type": "IP", "params": {"nprobe": 1000}},
             limit=n_results,
         )
 
@@ -525,7 +531,7 @@ class LongTermMemory:
         sparse_search_request = AnnSearchRequest(
             data=sparse_query_embedding,
             anns_field="sparse_vector",
-            param={"metric_type": "IP", "params": {"nprobe": 100}},
+            param={"metric_type": "IP", "params": {"nprobe": 1000}},
             limit=n_results,
         )
 
@@ -556,6 +562,8 @@ class LongTermMemory:
                 limit=n_results,
                 filter=dynamic_filter,
             )
+
+            # Filter the response to only include chunks with the extracted entities
             hits = []
             for hit in response[0]:
                 entities = hit.entity.get("entities")
@@ -563,6 +571,8 @@ class LongTermMemory:
                     hits.append(hit)
             if hits:
                 response[0] = hits
+
+        # If no entities were extracted or no relevant chunks were found, perform a general search
         if not extracted_entities or not len(response):
             response = self._chunks.hybrid_search(
                 reqs=[

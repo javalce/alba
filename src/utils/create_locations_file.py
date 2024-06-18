@@ -1,9 +1,21 @@
-import camelot
+# Standard library imports
 import json
 import re
 
+# Third-party imports
+import camelot
+
 
 def extract_locations_from_pdf(pdf_path):
+    """
+    Extract location data (municipios, comarcas, pedanias) from a PDF file.
+
+    Args:
+        pdf_path (str): Path to the PDF file.
+
+    Returns:
+        dict: A dictionary containing the extracted location data.
+    """
     municipios = []
     comarcas = []
     pedanias = []
@@ -53,6 +65,13 @@ def extract_locations_from_pdf(pdf_path):
 
 
 def save_to_json(data, output_path):
+    """
+    Save data to a JSON file.
+
+    Args:
+        data (dict): The data to be saved.
+        output_path (str): Path to the output JSON file.
+    """
     with open(output_path, "w", encoding="utf-8") as file:
         json.dump(data, file, ensure_ascii=False, indent=2)
 

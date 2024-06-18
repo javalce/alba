@@ -1,10 +1,15 @@
-import os
+# Third-party imports
 import streamlit as st
 from streamlit import session_state as ss
+
+# Local application imports
 from src.chatbot import Chatbot
 
 
 def main():
+    """
+    Main function to run the Alba chatbot application.
+    """
     # Configure page
     st.set_page_config(
         page_title="Alba - Asistente de Búsqueda Local y Privado",
@@ -12,6 +17,7 @@ def main():
         layout="wide",
     )
     st.title("Alba 👩 (Asistente de Búsqueda Local y Privado)")
+
     # Initialize chatbot if necessary
     if "chatbot" not in ss:
         ss.chatbot = Chatbot()

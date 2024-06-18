@@ -6,8 +6,14 @@ from src.memory.short_term_memory import ShortTermMemory
 from src.response_engine import ResponseEngine
 from src.chatbot import Chatbot
 
+# ---------------------------------------------------------------------
+# Load the Excel file with questions and contexts for evaluation
+# and generate/evaluate responses using the chatbot
+# ---------------------------------------------------------------------
+
+
 # Load the Excel file
-df = pd.read_excel("evaluation_triplets.xlsx")  # Adjust the file path if necessary
+df = pd.read_excel("evaluation_triplets.xlsx")
 
 # Initialize the chatbot
 chatbot = Chatbot()

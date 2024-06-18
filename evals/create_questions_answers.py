@@ -3,10 +3,15 @@ import json
 from src.chatbot import Chatbot
 from evals.evaluator import Evaluator
 
+# ------------------------------------------------------------
+# Main function to create the Question/Context/Answer triplets
+# that will be used for evaluation.
+# ------------------------------------------------------------
+
 
 def main():
     # Path to the PDF file
-    pdf_path = "data/Impresion_libro_de_decretos_N_1_2023___N_5060_2023.pdf"
+    pdf_path = ""
 
     # Path to the triplets Excel file
     triplets_file_path = "evaluation_triplets.xlsx"

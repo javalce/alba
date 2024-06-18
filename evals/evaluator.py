@@ -12,6 +12,12 @@ from tenacity import (
 )
 from dotenv import load_dotenv
 
+# ------------------------------------------------------------
+# Evaluator Class; used to evaluate the chatbot responses
+# based on the context, question, and answer triplets
+# ------------------------------------------------------------
+
+
 # Load environment variables
 load_dotenv()
 

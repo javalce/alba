@@ -18,7 +18,6 @@ venv/
 data/
 logs/
 db/
-models/
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -27,7 +26,6 @@ models/
 .vscode/
 
 # Data files
-*.pkl
 *.csv
 *.xls
 *.xlsx

@@ -1,4 +1,3 @@
-import os
 import time
 import logging
 import concurrent.futures
@@ -8,8 +7,12 @@ from milvus_model.hybrid import BGEM3EmbeddingFunction
 from milvus_model.sparse import BM25EmbeddingFunction
 from milvus_model.sparse.bm25.tokenizers import build_default_analyzer
 import torch
-import nltk
 import PyPDF2
+
+# ------------------------------------------------------------
+# This script is used to compare the performance of different
+# embedding methods and configurations
+# ------------------------------------------------------------
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")

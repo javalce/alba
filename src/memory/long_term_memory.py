@@ -1,10 +1,9 @@
 import os
+import json
 import torch
-import shutil
 from tqdm import tqdm
 import pickle
 import nltk
-import json
 from pathlib import Path
 import logging
 from pathlib import Path
@@ -19,7 +18,7 @@ from milvus_model.sparse import BM25EmbeddingFunction
 from milvus_model.sparse.bm25.tokenizers import build_default_analyzer
 from pymilvus.orm.schema import CollectionSchema, FieldSchema
 from src.utils.utils import setup_logging
-from src.utils.ner_extraction import extract_entities
+from src.utils.ner_extraction import EntityExtractor
 
 setup_logging()
 
@@ -27,6 +26,7 @@ setup_logging()
 class LongTermMemory:
     def __init__(self):
         self.run_mode = Config.get("run_mode")
+        self.ner_extractor = EntityExtractor(Config.get("locations_file"))
 
         # Define the weights for the hybrid search
         self.DENSE_SEARCH_WEIGHT = 0.1
@@ -412,14 +412,29 @@ class LongTermMemory:
 
         # Prepare records with both embeddings for each chunk
         for i, chunk in tqdm(enumerate(chunks), desc="Generating chunk records"):
-            entities = extract_entities(chunk.text)
+            entities = self.ner_extractor.extract_entities(chunk.text)
+            entities_list = [{"type": ent[0], "value": ent[1]} for ent in entities]
+            # Extract the document ID from the chunk ID
+            parent_document_id = chunk.id.split("_")[0]
+
+            # Check if LAW entity already exists
+            law_entity_exists = any(
+                ent
+                for ent in entities_list
+                if ent["type"] == "LAW" and ent["value"] == parent_document_id
+            )
+
+            # Add the LAW entity with the parent document ID if it doesn't already exist
+            if not law_entity_exists:
+                entities_list.append({"type": "LAW", "value": parent_document_id})
+
             record = {
                 "id": chunk.id,
                 "dense_vector": dense_embeddings[i].tolist(),
                 "sparse_vector": sparse_embeddings[i],
                 "parent_id": chunk.metadata.get("parent_id", 0),
                 "text": chunk.text[: Config.get("chunk_size")],
-                "entities": entities,
+                "entities": entities_list,
             }
             records.append(record)
 
@@ -465,7 +480,7 @@ class LongTermMemory:
         Returns:
             List[Document]: List of relevant documents.
         """
-        n_results = 10
+        n_results = 1000
         results = self._find_relevant_chunks(query, n_results)
         documents = self._retrieve_parent_documents(results, n_docs)
         context = self._create_context(documents)
@@ -514,12 +529,19 @@ class LongTermMemory:
             limit=n_results,
         )
 
-        extracted_entities = extract_entities(query)
-        entity_texts = [ent["text"] for ent in extracted_entities]
-        sanitized_texts = [text.replace('"', '\\"') for text in entity_texts]
-        filter_texts = '", "'.join(sanitized_texts)
-        dynamic_filter = f'JSON_CONTAINS_ANY(entities["text"], ["{filter_texts}"])'
+        extracted_entities = self.ner_extractor.extract_entities(query)
+        if extracted_entities:
+            # Construct the JSON array for JSON_CONTAINS_ANY
+            entity_list = [
+                {"type": entity_type, "value": entity_value.replace('"', '\\"')}
+                for entity_type, entity_value in extracted_entities
+            ]
+            entity_list_json = json.dumps(entity_list)  # Convert to JSON string
 
+            # Construct the filter using JSON_CONTAINS_ANY
+            dynamic_filter = f"JSON_CONTAINS_ANY(entities, {entity_list_json})"
+
+        response = None
         # Perform Hybrid Search
         if extracted_entities:
             response = self._chunks.hybrid_search(
@@ -534,7 +556,14 @@ class LongTermMemory:
                 limit=n_results,
                 filter=dynamic_filter,
             )
-        if not extracted_entities or response[0].num == 0:
+            hits = []
+            for hit in response[0]:
+                entities = hit.entity.get("entities")
+                if any(ent in entities for ent in entity_list):
+                    hits.append(hit)
+            if hits:
+                response[0] = hits
+        if not extracted_entities or not len(response):
             response = self._chunks.hybrid_search(
                 reqs=[
                     dense_search_request,
@@ -546,7 +575,6 @@ class LongTermMemory:
                 output_fields=["parent_id"],
                 limit=n_results,
             )
-
         return response[0]
 
     def _retrieve_parent_documents(

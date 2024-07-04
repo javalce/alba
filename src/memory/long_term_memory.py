@@ -87,17 +87,11 @@ class LongTermMemory:
 
             return bm25_ef
         elif ef_type == "dense":
-            # Determina el dispositivo en función de la disponibilidad de CUDA
-            device = "cuda:0" if torch.cuda.is_available() else "cpu"
-
-            # Configura la función de embedding para usar GPU si está disponible, y FP16 si es apropiado
-            use_fp16 = True if device.startswith("cuda") else False
-
             # Más información aquí: https://milvus.io/docs/embed-with-bgm-m3.md
             bgeM3_ef = BGEM3EmbeddingFunction(
                 model_name="BAAI/bge-m3",  # Especifica el nombre del modelo
-                device=device,  # Usa el dispositivo determinado (CPU o GPU)
-                use_fp16=use_fp16,  # Usa FP16 si está en CUDA, de lo contrario False
+                device="cpu",
+                use_fp16=False,  # Usa FP16 si está en CUDA, de lo contrario False
                 return_colbert_vecs=False,  # No se necesitan vectores de salida de COLBERT
                 return_dense=True,  # Vectores densos para búsqueda semántica
                 return_sparse=False,  # Los dispersos los tomaremos de bm25

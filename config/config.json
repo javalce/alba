@@ -1,5 +1,5 @@
 {
-    "run_mode": "NO_RES_NO_LOAD",
+    "run_mode": "RES_LOAD",
     "db_url": "http://localhost:19530",
     "model_api_url": "http://localhost:11434/api/generate",
     "templates_path": "src/templates/template.json",

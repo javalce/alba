@@ -1,7 +1,14 @@
-import json
+from functools import lru_cache
+from pathlib import Path
+from typing import Literal
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-class Config:
+class Config(BaseSettings):
     """
     A class for managing configuration settings.
 
@@ -9,36 +16,37 @@ class Config:
     to retrieve configuration values by key.
     """
 
-    config = None
+    model_config = SettingsConfigDict(
+        env_file=BASE_DIR / ".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+    )
 
-    @classmethod
-    def load_config(cls):
-        """
-        Load the configuration from the JSON file.
+    RUN_MODE: Literal["RES_LOAD", "NO_RES_NO_LOAD"]
+    DB_URL: str = Field(default="http://localhost:19530")
+    MODEL_API_URL: str = Field(default="http://localhost:11434/api/generate")
+    TEMPLATES_PATH: str = Field(default="src/templates/template.json")
+    DEFAULT_INFERENCE_MODEL: str = Field(default="llama3")
+    DENSE_EMBED_FUNC_DIM: int = Field(default=1024)
+    SPARSE_EMBED_FUNC_PATH: str = Field(default="models/bm25_model.pkl")
+    DB_COLLECTION: str = Field(default="rag")
+    DB_PATH: str = Field(default="chatbot/db")
+    MILVUS_HOST: str = Field(default="127.0.0.1")
+    MILVUS_PORT: int = Field(default=19530)
+    RAW_DATA_FOLDER: str = Field(default="data/raw")
+    PROCESSED_DATA_FOLDER: str = Field(default="data/processed")
+    STAGE_DATA_FOLDER: str = Field(default="data/stage")
+    EMBEDDINGS_PATH: str = Field(default="data/embeddings")
+    LOCATIONS_FILE: str = Field(default="config/locations.json")
+    BATCH_SIZE: int = Field(default=100)
+    MAX_DOC_SIZE: int = Field(default=8192)
+    CHUNK_SIZE: int = Field(default=500)
+    CHUNK_OVERLAP: int = Field(default=100)
+    CHUNK_TEXT_SIZE: int = Field(default=1000)
+    LOG_PATH: str = Field(default="logs/log.log")
+    FALSE_POSITIVES_FILE: str = Field(default="config/false_positives.txt")
 
-        This method reads the configuration from the 'config/config.json' file
-        and stores it in the `config` class variable. If the configuration is
-        already loaded, this method does nothing.
-        """
-        if cls.config is None:
-            with open("config/config.json", "r") as f:
-                cls.config = json.load(f)
 
-    @classmethod
-    def get(cls, key):
-        """
-        Get the value of a configuration setting by key.
-
-        This method retrieves the value of the specified `key` from the loaded
-        configuration. If the configuration is not yet loaded, it first calls
-        the `load_config` method to load the configuration from the JSON file.
-
-        Args:
-            key (str): The key of the configuration setting to retrieve.
-
-        Returns:
-            The value of the configuration setting, or None if the key is not found.
-        """
-        if cls.config is None:
-            cls.load_config()
-        return cls.config.get(key)
+@lru_cache
+def get_config():
+    return Config()

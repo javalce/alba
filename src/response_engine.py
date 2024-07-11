@@ -5,7 +5,7 @@ from typing import Any
 from ollama import chat
 
 # Local application imports
-from config.config import Config
+from config.config import get_config
 from src.templates.template_manager import TemplateManager
 
 
@@ -22,6 +22,7 @@ class ResponseEngine:
             model_name (str): Identifier for the type of model or response generation strategy to use.
         """
         self._model = model_name
+        self.config = get_config()
 
     def _load_model(self, model_name: str) -> Any:
         """
@@ -58,7 +59,7 @@ class ResponseEngine:
 
         # Send the messages to the chat model
         response = chat(
-            Config.get("default_inference_model"), messages=messages, stream=False
+            self.config.DEFAULT_INFERENCE_MODEL, messages=messages, stream=False
         )
 
         return response["message"]["content"]

@@ -1,5 +1,5 @@
 # Local application imports
-from config.config import Config
+from config.config import get_config
 from src.response_engine import ResponseEngine
 from src.memory.long_term_memory import LongTermMemory
 from src.memory.short_term_memory import ShortTermMemory
@@ -15,9 +15,11 @@ class Chatbot:
         """
         Initialize the Chatbot object with long-term memory, short-term memory, and a response engine.
         """
+        config = get_config()
+
         self.long_term_mem = LongTermMemory()
         self.short_term_mem = ShortTermMemory()
-        model = Config.get("inference_model")
+        model = config.DEFAULT_INFERENCE_MODEL
         self.resp_engine = ResponseEngine(model)
 
     def recall_messages(self):

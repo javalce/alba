@@ -20,7 +20,7 @@ from pymilvus import Collection, DataType, MilvusClient, connections
 from pymilvus.client.abstract import AnnSearchRequest, SearchResult, WeightedRanker
 
 # Local application imports
-from config.config import Config
+from config.config import get_config
 from src.utils.utils import setup_logging
 from src.utils.ner_extraction import EntityExtractor
 from src.document_engine import Document, DocumentEngine
@@ -31,8 +31,10 @@ setup_logging()
 
 class LongTermMemory:
     def __init__(self):
-        self.run_mode = Config.get("run_mode")
-        self.ner_extractor = EntityExtractor(Config.get("locations_file"))
+        self.config = get_config()
+
+        self.run_mode = self.config.RUN_MODE
+        self.ner_extractor = EntityExtractor(self.config.LOCATIONS_FILE)
 
         # Define the weights for the hybrid search
         self.DENSE_SEARCH_WEIGHT = 0.1
@@ -49,8 +51,8 @@ class LongTermMemory:
         self._load_collections()
 
     def _connect(self):
-        host = Config.get("MILVUS_HOST")
-        port = Config.get("MILVUS_PORT")
+        host = self.config.MILVUS_HOST
+        port = self.config.MILVUS_PORT
         connections.connect(host=host, port=port)
         client = MilvusClient(host=host, port=port)
         return client
@@ -59,7 +61,7 @@ class LongTermMemory:
         if ef_type == "sparse":
             # More info here: https://milvus.io/docs/embed-with-bm25.md
             # If a bm25 model already exists, load it. Otherwise, create a new one.
-            model_path = Config.get("sparse_embed_func_path")
+            model_path = self.config.SPARSE_EMBED_FUNC_PATH
             if os.path.exists(model_path):
                 # Load the existing model
                 with open(model_path, "rb") as file:
@@ -116,7 +118,7 @@ class LongTermMemory:
 
     def _ingest_folder(self):
         # Define paths using configuration settings
-        raw_folder = Path(Config.get("raw_data_folder"))
+        raw_folder = Path(self.config.RAW_DATA_FOLDER)
 
         if self.run_mode == "RES_LOAD":
             # Read and generate documents from PDF files in the raw data folder
@@ -227,7 +229,7 @@ class LongTermMemory:
                 FieldSchema(
                     name="text",
                     dtype=DataType.VARCHAR,
-                    max_length=Config.get("max_doc_size"),
+                    max_length=self.config.MAX_DOC_SIZE,
                 ),
                 # Add a docs vector; Milvus requires at least one vector field in the schema
                 # This is not used, just a workaround to satisfy the schema requirements
@@ -270,7 +272,7 @@ class LongTermMemory:
                 FieldSchema(
                     name="text",
                     dtype=DataType.VARCHAR,
-                    max_length=Config.get("chunk_text_size"),
+                    max_length=self.config.CHUNK_TEXT_SIZE,
                 ),
                 FieldSchema(name="entities", dtype=DataType.JSON),
             ],
@@ -379,7 +381,7 @@ class LongTermMemory:
                     else 0
                 ),  # Ensure number is not None
                 "text": doc.text[
-                    : Config.get("doc_size")
+                    : self.config.MAX_DOC_SIZE
                 ],  # Truncate text if necessary
                 "docs_vector": [0.0, 0.0],  # Dummy vector for the docs_vector field
             }
@@ -431,7 +433,7 @@ class LongTermMemory:
                 "dense_vector": dense_embeddings[i].tolist(),
                 "sparse_vector": sparse_embeddings[i],
                 "parent_id": chunk.metadata.get("parent_id", 0),
-                "text": chunk.text[: Config.get("chunk_size")],
+                "text": chunk.text[: self.config.CHUNK_SIZE],
                 "entities": entities_list,
             }
             records.append(record)

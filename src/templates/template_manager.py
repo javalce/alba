@@ -1,5 +1,5 @@
 import json
-from config.config import Config
+from config.config import get_config
 
 
 class TemplateManager:
@@ -15,8 +15,10 @@ class TemplateManager:
         Load templates from the JSON file specified in the configuration.
         This method is called automatically when accessing templates if they are not already loaded.
         """
+        config = get_config()
+
         if cls.templates is None:
-            templates_path = Config.get("templates_path")
+            templates_path = config.TEMPLATES_PATH
             with open(templates_path, "r") as f:
                 cls.templates = json.load(f)
 

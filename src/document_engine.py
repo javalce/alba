@@ -8,7 +8,7 @@ import fitz  # PyMuPDF
 from tqdm import tqdm
 
 # Local application imports
-from config.config import Config
+from config.config import get_config
 from src.utils.utils import setup_logging
 
 setup_logging()
@@ -34,6 +34,12 @@ class DocumentEngine:
     """
     A class for processing and generating documents from various file types.
     """
+    
+    def __init__(self):
+        """
+        Initialize the DocumentEngine object with configuration settings.
+        """
+        self.config = get_config()
 
     def _identify_decree_type(self, text: str) -> str:
         """
@@ -229,8 +235,8 @@ class DocumentEngine:
         Returns:
             A list of chunked Document objects.
         """
-        chunk_size = Config.get("chunk_size")
-        overlap = Config.get("chunk_overlap")
+        chunk_size = self.config.CHUNK_SIZE
+        overlap = self.config.CHUNK_OVERLAP
 
         chunked_documents = []
         for doc in documents:

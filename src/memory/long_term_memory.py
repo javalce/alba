@@ -404,9 +404,7 @@ class LongTermMemory:
 
         # Convert sparse embeddings from csr_array format to a list for insertion
         sparse_embeddings = [
-            sparse_embedding.toarray().tolist()[
-                0
-            ]  # Ensure it's a list of lists, not a list of arrays
+            sparse_embedding.toarray().tolist()  # Ensure it's a list of lists, not a list of arrays
             for sparse_embedding in raw_sparse_embeddings
         ]
 

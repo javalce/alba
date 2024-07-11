@@ -19,7 +19,7 @@ class Chatbot:
 
         self.long_term_mem = LongTermMemory()
         self.short_term_mem = ShortTermMemory()
-        model = config.DEFAULT_INFERENCE_MODEL
+        model = config.INFERENCE_MODEL
         self.resp_engine = ResponseEngine(model)
 
     def recall_messages(self):

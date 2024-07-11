@@ -1,6 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Union
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -27,6 +27,7 @@ class Config(BaseSettings):
     MODEL_API_URL: str = Field(default="http://localhost:11434/api/generate")
     TEMPLATES_PATH: str = Field(default="src/templates/template.json")
     DEFAULT_INFERENCE_MODEL: str = Field(default="llama3")
+    INFERENCE_MODEL: Union[str, None] = Field(default=None)
     DENSE_EMBED_FUNC_DIM: int = Field(default=1024)
     SPARSE_EMBED_FUNC_PATH: str = Field(default="models/bm25_model.pkl")
     DB_COLLECTION: str = Field(default="rag")
@@ -39,6 +40,7 @@ class Config(BaseSettings):
     EMBEDDINGS_PATH: str = Field(default="data/embeddings")
     LOCATIONS_FILE: str = Field(default="config/locations.json")
     BATCH_SIZE: int = Field(default=100)
+    DOC_SIZE: Union[int, None] = Field(default=None)
     MAX_DOC_SIZE: int = Field(default=8192)
     CHUNK_SIZE: int = Field(default=500)
     CHUNK_OVERLAP: int = Field(default=100)

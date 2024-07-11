@@ -381,7 +381,7 @@ class LongTermMemory:
                     else 0
                 ),  # Ensure number is not None
                 "text": doc.text[
-                    : self.config.MAX_DOC_SIZE
+                    : self.config.DOC_SIZE
                 ],  # Truncate text if necessary
                 "docs_vector": [0.0, 0.0],  # Dummy vector for the docs_vector field
             }

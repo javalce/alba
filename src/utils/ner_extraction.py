@@ -8,7 +8,7 @@ import spacy
 from spacy.matcher import PhraseMatcher
 
 # Local application imports
-from config.config import Config
+from config.config import get_config
 
 
 class EntityExtractor:
@@ -24,7 +24,7 @@ class EntityExtractor:
             locations_file (str): Path to the JSON file containing location data.
         """
         # Load spaCy model
-        false_positives_file = Config().get("false_positives_file")
+        false_positives_file = get_config().FALSE_POSITIVES_FILE
         self.nlp = spacy.load("es_core_news_lg")
 
         # Initialize PhraseMatcher

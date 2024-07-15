@@ -1,4 +1,3 @@
-
 # Private Offline LLM-Powered RAG Chatbot
 
 ## Introduction
@@ -27,6 +26,31 @@ This repository contains the implementation of a fully private, fully offline, L
    poetry install
    ```
 
+### Post-Installation
+
+After installing the dependencies, you will need to download the pre-trained model weights. To do this, run the following command:
+
+```bash
+python -m spacy download es_core_news_lg
+```
+
+This will download the pre-trained Spanish language model for spaCy.
+
+```bash
+python -m nltk.downloader punkt
+```
+
+This will download the punkt tokenizer for NLTK.
+
+> [!IMPORTANT]
+> You will need to have a milvus database running and a ollama server with the model loaded in order to use the chatbot.
+>
+> The ollama model is specified in the `config/config.py` file under the `DEFAULT_INFERENCE_MODEL` key. It defaults to `llama3`.
+
+### Environment Variables
+
+You can create a `.env` file in the root directory of the project to customize the behavior of the chatbot. The following environment variables are supported:
+
 ## Usage
 
 Launch the chatbot by running:
@@ -41,8 +65,6 @@ Interact with the chatbot through the streamlit GUI.
 
 To configure the chatbot settings, refer to the `config/config.json` file where you can adjust various parameters such as model settings, privacy options, etc.
 
-
 ## License
 
 This project is licensed under the MIT License - see the `LICENSE` file for details.
-

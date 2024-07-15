@@ -9,6 +9,7 @@ from milvus_model.sparse import BM25EmbeddingFunction
 from milvus_model.sparse.bm25.tokenizers import build_default_analyzer
 from pymilvus import Collection, MilvusClient, connections
 from pymilvus.orm.schema import CollectionSchema
+from tqdm import tqdm
 
 from config.config import get_config
 from src.database.schemas import get_chunk_schema, get_document_schema
@@ -184,7 +185,7 @@ class Database:
         )
 
         # Process documents in batches starting from start_from
-        for i in range(num_batches):
+        for i in tqdm(range(num_batches), desc="Processing and inserting document chunks"):
             # Adjust batch slice indices based on start_from
             start_idx = start_from + i * batch_size
             end_idx = min(start_from + (i + 1) * batch_size, len(documents))
@@ -266,7 +267,7 @@ class Database:
         ]
 
         # Prepare records with both embeddings for each chunk
-        for i, chunk in enumerate(chunks):
+        for i, chunk in tqdm(enumerate(chunks), desc="Generating chunk records"):
             entities = self.ner_extractor.extract_entities(chunk.text)
             entities_list = [{"type": ent[0], "value": ent[1]} for ent in entities]
             # Extract the document ID from the chunk ID

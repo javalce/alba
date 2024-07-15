@@ -1,40 +1,25 @@
-from typing import List
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 
+from src.chat import chat_router
 from src.chatbot import Chatbot
 
-app = FastAPI(
-    title="Alba - Asistente de Búsqueda Local y Privado",
-)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+def create_app():
+    app = FastAPI(
+        title="Alba - Asistente de Búsqueda Local y Privado",
+    )
 
-app.state.chatbot = Chatbot()
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
+    app.state.chatbot = Chatbot()
 
-class Message(BaseModel):
-    role: str
-    content: str
+    app.include_router(chat_router, prefix="/api")
 
-
-class Messages(BaseModel):
-    messages: List[Message]
-
-
-@app.post("/api/chat")
-def chat(request: Messages):
-    chatbot: Chatbot = app.state.chatbot
-
-    message = request.messages[-1]
-
-    return StreamingResponse(chatbot.respond_w_sources(message.content))
+    return app

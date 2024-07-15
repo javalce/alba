@@ -4,7 +4,7 @@ from typing import List, Tuple
 from pymilvus.client.abstract import AnnSearchRequest, SearchResult, WeightedRanker
 
 from config.config import get_config
-from src.database.database import Database
+from src.database import Database
 from src.document_engine import Document
 from src.utils.ner_extraction import EntityExtractor
 from src.utils.utils import setup_logging

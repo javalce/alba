@@ -7,12 +7,11 @@ import nltk
 from milvus_model.hybrid import BGEM3EmbeddingFunction
 from milvus_model.sparse import BM25EmbeddingFunction
 from milvus_model.sparse.bm25.tokenizers import build_default_analyzer
-from pymilvus import Collection, MilvusClient, connections
+from pymilvus import Collection, DataType, FieldSchema, MilvusClient, connections
 from pymilvus.orm.schema import CollectionSchema
 from tqdm import tqdm
 
 from config.config import get_config
-from src.database.schemas import get_chunk_schema, get_document_schema
 from src.document_engine import Document, DocumentEngine
 from src.utils.utils import setup_logging
 
@@ -94,8 +93,81 @@ class Database:
         client = MilvusClient(host=host, port=port)
         return client
 
+    def __get_docs_schema(self) -> CollectionSchema:
+        """
+        Returns a schema for the long-term memory database of documents.
+        """
+        schema = CollectionSchema(
+            [
+                FieldSchema(
+                    name="id",
+                    dtype=DataType.VARCHAR,
+                    max_length=32,
+                    is_primary=True,
+                    auto_id=False,
+                ),
+                FieldSchema(name="page", dtype=DataType.INT64),
+                FieldSchema(name="date", dtype=DataType.VARCHAR, max_length=32),
+                FieldSchema(name="type", dtype=DataType.VARCHAR, max_length=32),
+                FieldSchema(name="number", dtype=DataType.INT64),
+                FieldSchema(
+                    name="text",
+                    dtype=DataType.VARCHAR,
+                    max_length=self.config.MAX_DOC_SIZE,
+                ),
+                # Add a docs vector; Milvus requires at least one vector field in the schema
+                # This is not used, just a workaround to satisfy the schema requirements
+                FieldSchema(name="docs_vector", dtype=DataType.FLOAT_VECTOR, dim=2),
+            ],
+            description="Collection for storing text and metadata of each document",
+            enable_auto_id=False,
+        )
+
+        return schema
+
+    def __get_chunks_schema(self) -> CollectionSchema:
+        """
+        Returns a schema for the long-term memory database of chunks.
+        """
+        schema = CollectionSchema(
+            [
+                FieldSchema(
+                    name="id",
+                    dtype=DataType.VARCHAR,
+                    max_length=32,
+                    is_primary=True,
+                    auto_id=False,
+                ),
+                FieldSchema(
+                    name="dense_vector",
+                    dtype=DataType.FLOAT_VECTOR,
+                    dim=self.__dense_ef.dim["dense"],
+                ),
+                FieldSchema(
+                    name="sparse_vector",
+                    dtype=DataType.FLOAT_VECTOR,
+                    dim=self.__sparse_ef.dim,
+                ),
+                FieldSchema(
+                    name="parent_id",
+                    dtype=DataType.VARCHAR,
+                    max_length=32,
+                ),
+                FieldSchema(
+                    name="text",
+                    dtype=DataType.VARCHAR,
+                    max_length=self.config.CHUNK_TEXT_SIZE,
+                ),
+                FieldSchema(name="entities", dtype=DataType.JSON),
+            ],
+            description="Collection for storing chunk embeddings",
+            enable_auto_id=False,
+        )
+
+        return schema
+
     def __create_docs_schema(self) -> CollectionSchema:
-        schema = get_document_schema()
+        schema = self.__get_docs_schema()
         self.__client.create_collection(collection_name=DOCS_COLLECTION_NAME, schema=schema)
 
         # Adjusted index_params structure to be a list containing one dictionary
@@ -117,7 +189,7 @@ class Database:
         )
 
     def __create_chunks_schema(self) -> CollectionSchema:
-        schema = get_chunk_schema(self.__dense_ef.dim, self.__sparse_ef.dim)
+        schema = self.__get_chunks_schema()
         self.__client.create_collection(collection_name=CHUNKS_COLLECTION_NAME, schema=schema)
 
         # Define index parameters for both fields as a list of dictionaries

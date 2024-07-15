@@ -1,6 +1,6 @@
 from typer import Typer
 
-from src.database.database import Database
+from src.database import Database
 
 app = Typer(rich_markup_mode="rich")
 

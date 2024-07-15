@@ -1,5 +1,4 @@
-from altair import DataType
-from pymilvus import CollectionSchema, FieldSchema
+from pymilvus import CollectionSchema, DataType, FieldSchema
 
 from config.config import get_config
 

@@ -4,6 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["pablovazquezg <pablovazquezg@gmail.com>"]
 readme = "README.md"
+packages = [{ include = "src", from = "." }]
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -31,6 +32,9 @@ fastapi = "^0.111.1"
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.5.2"
 black = "^24.4.2"
+
+[tool.poetry.scripts]
+alba = "src.cli.cli:main"
 
 [build-system]
 requires = ["poetry-core"]

@@ -31,7 +31,7 @@ class Messages(BaseModel):
     messages: List[Message]
 
 
-@app.get("/api/chat")
+@app.post("/api/chat")
 def chat(request: Messages):
     chatbot: Chatbot = app.state.chatbot
 

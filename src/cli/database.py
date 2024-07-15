@@ -1,6 +1,6 @@
 from typer import Typer
 
-from config.config import get_config
+from src.database.database import Database
 
 app = Typer(rich_markup_mode="rich")
 
@@ -10,6 +10,6 @@ def create_schema():
     """
     Creates the milvus database schema.
     """
-    config = get_config()
+    db = Database()
 
-    print(config)
+    db.initialize()

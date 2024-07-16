@@ -25,7 +25,7 @@ class Config(BaseSettings):
     RUN_MODE: Literal["RES_LOAD", "NO_RES_NO_LOAD"]
     DB_URL: str = Field(default="http://localhost:19530")
     MODEL_API_URL: str = Field(default="http://localhost:11434/api/generate")
-    TEMPLATES_PATH: str = Field(default="src/templates/template.json")
+    TEMPLATES_PATH: str = Field(default="src/alba/templates/template.json")
     DEFAULT_INFERENCE_MODEL: str = Field(default="llama3")
     INFERENCE_MODEL: Union[str, None] = Field(default=None)
     DENSE_EMBED_FUNC_DIM: int = Field(default=1024)

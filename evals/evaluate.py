@@ -1,10 +1,6 @@
 import pandas as pd
-from config.config import Config
-from src.templates.template_manager import TemplateManager
-from src.memory.long_term_memory import LongTermMemory
-from src.memory.short_term_memory import ShortTermMemory
-from src.response_engine import ResponseEngine
-from src.chatbot import Chatbot
+
+from alba.chatbot import Chatbot
 
 # ---------------------------------------------------------------------
 # Load the Excel file with questions and contexts for evaluation

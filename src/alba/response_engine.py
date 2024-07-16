@@ -5,8 +5,8 @@ from typing import Any
 from ollama import chat
 
 # Local application imports
-from config.config import get_config
-from src.templates.template_manager import TemplateManager
+from alba.config import get_config
+from alba.templates.template_manager import TemplateManager
 
 
 class ResponseEngine:
@@ -58,8 +58,6 @@ class ResponseEngine:
         ]
 
         # Send the messages to the chat model
-        response = chat(
-            self.config.DEFAULT_INFERENCE_MODEL, messages=messages, stream=False
-        )
+        response = chat(self.config.DEFAULT_INFERENCE_MODEL, messages=messages, stream=False)
 
         return response["message"]["content"]

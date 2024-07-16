@@ -11,9 +11,9 @@ from pymilvus import Collection, DataType, FieldSchema, MilvusClient, connection
 from pymilvus.orm.schema import CollectionSchema
 from tqdm import tqdm
 
-from config.config import get_config
-from src.document_engine import Document, DocumentEngine
-from src.utils.utils import setup_logging
+from alba.config import get_config
+from alba.document_engine import Document, DocumentEngine
+from alba.utils.utils import setup_logging
 
 # Setup logging
 setup_logging()

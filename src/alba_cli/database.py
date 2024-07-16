@@ -1,9 +1,8 @@
 from pathlib import Path
 from typing import Annotated
 
+from alba.database import Database
 from typer import Argument, Typer
-
-from src.database import Database
 
 app = Typer(rich_markup_mode="rich")
 

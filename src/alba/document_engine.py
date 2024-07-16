@@ -8,8 +8,8 @@ import fitz  # PyMuPDF
 from tqdm import tqdm
 
 # Local application imports
-from config.config import get_config
-from src.utils.utils import setup_logging
+from alba.config import get_config
+from alba.utils.utils import setup_logging
 
 setup_logging()
 
@@ -34,7 +34,7 @@ class DocumentEngine:
     """
     A class for processing and generating documents from various file types.
     """
-    
+
     def __init__(self):
         """
         Initialize the DocumentEngine object with configuration settings.
@@ -83,11 +83,7 @@ class DocumentEngine:
             text_start = text.find("OBJETO:")
 
         header_start = text.find("Decreto Nº")
-        text = (
-            text[text_start:header_start].strip()
-            if header_start != -1
-            else text.strip()
-        )
+        text = text[text_start:header_start].strip() if header_start != -1 else text.strip()
 
         doc = Document(
             id=f"{decree_number}_{page_number}",
@@ -210,9 +206,7 @@ class DocumentEngine:
             str: The cleaned text.
         """
         # Use a temporary placeholder for "\n\n"
-        placeholder = (
-            "\ue000"  # Using a Private Use Area Unicode character as a placeholder
-        )
+        placeholder = "\ue000"  # Using a Private Use Area Unicode character as a placeholder
 
         # First, replace "\n \n" with the placeholder
         text = text.replace("\n\n", placeholder)

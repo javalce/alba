@@ -1,9 +1,9 @@
 # Local application imports
-from config.config import get_config
-from src.response_engine import ResponseEngine
-from src.memory.long_term_memory import LongTermMemory
-from src.memory.short_term_memory import ShortTermMemory
-from src.templates.template_manager import TemplateManager
+from alba.config import get_config
+from alba.memory.long_term_memory import LongTermMemory
+from alba.memory.short_term_memory import ShortTermMemory
+from alba.response_engine import ResponseEngine
+from alba.templates.template_manager import TemplateManager
 
 
 class Chatbot:
@@ -78,9 +78,7 @@ class Chatbot:
 
         response = self.resp_engine.generate_response(llm_prompt)
         response_n_sources = f"{response}\n\n{sources}"
-        self.short_term_mem.add_message(
-            {"role": "assistant", "content": response_n_sources}
-        )
+        self.short_term_mem.add_message({"role": "assistant", "content": response_n_sources})
 
         return response_n_sources
 
@@ -96,9 +94,7 @@ class Chatbot:
         """
         # Enrich the query with relevant facts from long-term memory
         context, sources = self.long_term_mem.get_context(user_prompt)
-        llm_prompt = TemplateManager.get(
-            "llm_prompt", query=user_prompt, context=context
-        )
+        llm_prompt = TemplateManager.get("llm_prompt", query=user_prompt, context=context)
 
         response = self.resp_engine.generate_response(llm_prompt)
         response_n_context = f"RESPONSE: {response}\n\nCONTEXT: {context}"

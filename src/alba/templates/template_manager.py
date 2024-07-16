@@ -1,5 +1,6 @@
 import json
-from config.config import get_config
+
+from alba.config import get_config
 
 
 class TemplateManager:
@@ -19,7 +20,7 @@ class TemplateManager:
 
         if cls.templates is None:
             templates_path = config.TEMPLATES_PATH
-            with open(templates_path, "r") as f:
+            with open(templates_path) as f:
                 cls.templates = json.load(f)
 
     @classmethod

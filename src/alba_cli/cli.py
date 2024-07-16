@@ -4,7 +4,7 @@ from rich.padding import Padding
 from rich.panel import Panel
 from typer import Typer
 
-from src.cli.database import app as db_app
+from alba_cli.database import app as db_app
 
 app = Typer(rich_markup_mode="rich")
 
@@ -37,7 +37,7 @@ def _run(command: str, reload: bool = True):
     print(Padding(panel, 1))
 
     uvicorn.run(
-        app="src.app:create_app",
+        app="alba.app:create_app",
         factory=True,
         host=host,
         port=port,

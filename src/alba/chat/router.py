@@ -4,7 +4,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from src.chatbot import Chatbot
+from alba.chatbot import Chatbot
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 

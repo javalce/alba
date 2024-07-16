@@ -2,7 +2,7 @@
 import logging
 
 # Local application imports
-from config.config import get_config
+from alba.config import get_config
 
 
 def setup_logging():

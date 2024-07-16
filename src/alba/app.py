@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.chat import chat_router
-from src.chatbot import Chatbot
+from alba.chat import chat_router
+from alba.chatbot import Chatbot
 
 
 def create_app():

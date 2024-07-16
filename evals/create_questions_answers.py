@@ -1,6 +1,7 @@
-import os
 import json
-from src.chatbot import Chatbot
+import os
+
+from alba.chatbot import Chatbot
 from evals.evaluator import Evaluator
 
 # ------------------------------------------------------------

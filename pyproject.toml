@@ -4,7 +4,10 @@ version = "0.1.0"
 description = ""
 authors = ["pablovazquezg <pablovazquezg@gmail.com>"]
 readme = "README.md"
-packages = [{ include = "src", from = "." }]
+packages = [
+    { include = "alba", from = "src" },
+    { include = "alba_cli", from = "src" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -34,7 +37,7 @@ ruff = "^0.5.2"
 black = "^24.4.2"
 
 [tool.poetry.scripts]
-alba = "src.cli.cli:main"
+alba = "alba_cli.cli:main"
 
 [build-system]
 requires = ["poetry-core"]

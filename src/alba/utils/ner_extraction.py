@@ -1,14 +1,14 @@
 # Standard library imports
-import re
 import json
+import re
 from typing import List, Tuple
 
 # Third-party imports
 import spacy
-from spacy.matcher import PhraseMatcher
 
 # Local application imports
-from config.config import get_config
+from alba.config import get_config
+from spacy.matcher import PhraseMatcher
 
 
 class EntityExtractor:
@@ -63,7 +63,7 @@ class EntityExtractor:
             locations_file (str): Path to the JSON file containing location data.
         """
         # Load locations from the JSON file
-        with open(locations_file, "r", encoding="utf-8") as f:
+        with open(locations_file, encoding="utf-8") as f:
             locations_data = json.load(f)
 
         # Combine all locations into a list
@@ -91,7 +91,7 @@ class EntityExtractor:
             set: A set of false positive strings.
         """
         # Load false positives from the file
-        with open(false_positives_file, "r", encoding="utf-8") as f:
+        with open(false_positives_file, encoding="utf-8") as f:
             false_positives = {line.strip().lower() for line in f}
         return false_positives
 
@@ -148,9 +148,7 @@ class EntityExtractor:
 
         # Extract "PER" entities
         persons = [
-            (ent.label_, self.clean_text(ent.text))
-            for ent in doc.ents
-            if ent.label_ == "PER"
+            (ent.label_, self.clean_text(ent.text)) for ent in doc.ents if ent.label_ == "PER"
         ]
 
         # Filter out PER entities that contain false positives
@@ -166,16 +164,11 @@ class EntityExtractor:
 
         # Extract "LOC" entities using spaCy and PhraseMatcher
         locations = [
-            (ent.label_, self.clean_text(ent.text))
-            for ent in doc.ents
-            if ent.label_ == "LOC"
+            (ent.label_, self.clean_text(ent.text)) for ent in doc.ents if ent.label_ == "LOC"
         ]
         location_matches = self.location_matcher(doc)
         locations.extend(
-            [
-                ("LOC", self.clean_text(doc[start:end].text))
-                for _, start, end in location_matches
-            ]
+            [("LOC", self.clean_text(doc[start:end].text)) for _, start, end in location_matches]
         )
 
         # Filter out LOC entities that contain false positives

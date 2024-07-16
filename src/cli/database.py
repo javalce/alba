@@ -6,10 +6,20 @@ app = Typer(rich_markup_mode="rich")
 
 
 @app.command("init")
-def create_schema():
+def initialize_database_schema():
     """
     Creates the milvus database schema.
     """
     db = Database()
 
     db.initialize()
+
+
+@app.command("drop")
+def clear_database_schema():
+    """
+    Drops the milvus database schema.
+    """
+    db = Database()
+
+    db.clear_database()

@@ -221,6 +221,15 @@ class Database:
         self.__create_docs_schema()
         self.__create_chunks_schema()
 
+    def clear_database(self) -> None:
+        """
+        Drops all collections in the database.
+        """
+        collections = self.__client.list_collections()
+        for collection_name in collections:
+            self.__client.drop_collection(collection_name)
+            logging.info(f"Deleted documents from collection: {collection_name}")
+
     def __insert_chunk_records(self, chunk_records):
         """
         Batch load chunk records, including embeddings, into the chunks collection.

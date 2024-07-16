@@ -1,6 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal, Union
+from typing import Union
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -22,7 +22,6 @@ class Config(BaseSettings):
         case_sensitive=True,
     )
 
-    RUN_MODE: Literal["RES_LOAD", "NO_RES_NO_LOAD"]
     DB_URL: str = Field(default="http://localhost:19530")
     MODEL_API_URL: str = Field(default="http://localhost:11434/api/generate")
     TEMPLATES_PATH: str = Field(default="src/alba/templates/template.json")
@@ -34,10 +33,6 @@ class Config(BaseSettings):
     DB_PATH: str = Field(default="chatbot/db")
     MILVUS_HOST: str = Field(default="127.0.0.1")
     MILVUS_PORT: int = Field(default=19530)
-    RAW_DATA_FOLDER: str = Field(default="data/raw")
-    PROCESSED_DATA_FOLDER: str = Field(default="data/processed")
-    STAGE_DATA_FOLDER: str = Field(default="data/stage")
-    EMBEDDINGS_PATH: str = Field(default="data/embeddings")
     LOCATIONS_FILE: str = Field(default="config/locations.json")
     BATCH_SIZE: int = Field(default=100)
     DOC_SIZE: Union[int, None] = Field(default=None)

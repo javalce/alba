@@ -7,7 +7,7 @@ from alba.database import Database
 router = APIRouter(prefix="/documents", tags=["document"])
 
 
-@router.post("")
+@router.post("", responses={500: {"description": "Internal server error"}})
 @inject
 def add_document(files: list[UploadFile], db: Annotated[Database, Depends(Provide["db"])]):
     try:
@@ -20,7 +20,7 @@ def add_document(files: list[UploadFile], db: Annotated[Database, Depends(Provid
     return {"message": f"Succesfully added {[file.filename for file in files]}"}
 
 
-@router.post("/reset")
+@router.post("/reset", responses={500: {"description": "Internal server error"}})
 @inject
 def reset_documents(db: Annotated[Database, Depends(Provide["db"])]):
     try:

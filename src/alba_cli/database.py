@@ -47,3 +47,12 @@ def add_document(
     files = [str(file) for file in files]
 
     db.add_documents(files)
+
+
+@app.command("reset")
+def reset_database():
+    """
+    Resets the database.
+    """
+    db.clear_database()
+    db.initialize()

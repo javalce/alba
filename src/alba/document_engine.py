@@ -8,7 +8,7 @@ import fitz  # PyMuPDF
 from tqdm import tqdm
 
 # Local application imports
-from alba.config import get_config
+from alba.config import Config
 from alba.utils.utils import setup_logging
 
 setup_logging()
@@ -35,11 +35,11 @@ class DocumentEngine:
     A class for processing and generating documents from various file types.
     """
 
-    def __init__(self):
+    def __init__(self, config: Config):
         """
         Initialize the DocumentEngine object with configuration settings.
         """
-        self.config = get_config()
+        self.config = config
 
     def _identify_decree_type(self, text: str) -> str:
         """

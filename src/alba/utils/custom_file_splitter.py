@@ -1,7 +1,8 @@
 # Custom file splitter to split the large decrees file into smaller chunks for processing.
 
-import PyPDF2
 from pathlib import Path
+
+import PyPDF2
 
 
 def split_pdf(file_path, output_dir, splits):
@@ -22,10 +23,7 @@ def split_pdf(file_path, output_dir, splits):
         writer = PyPDF2.PdfWriter()
         for page_num in range(start_page, end_page):
             writer.add_page(pdf.pages[page_num])
-        chunk_path = (
-            output_dir
-            / f"{Path(file_path).stem}_chunk_{start_page + 1}_to_{end_page}.pdf"
-        )
+        chunk_path = output_dir / f"{Path(file_path).stem}_chunk_{start_page + 1}_to_{end_page}.pdf"
         with open(chunk_path, "wb") as chunk_file:
             writer.write(chunk_file)
         chunk_paths.append(chunk_path)
@@ -36,8 +34,7 @@ def split_pdf(file_path, output_dir, splits):
         for page_num in range(start_page, num_pages):
             writer.add_page(pdf.pages[page_num])
         chunk_path = (
-            output_dir
-            / f"{Path(file_path).stem}_chunk_{start_page + 1}_to_{num_pages}.pdf"
+            output_dir / f"{Path(file_path).stem}_chunk_{start_page + 1}_to_{num_pages}.pdf"
         )
         with open(chunk_path, "wb") as chunk_file:
             writer.write(chunk_file)

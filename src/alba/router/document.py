@@ -1,16 +1,17 @@
-from fastapi import APIRouter, Request, UploadFile
+from dependency_injector.wiring import Provide, inject
+from fastapi import APIRouter, UploadFile
+from typing_extensions import Annotated
 
-from alba.chatbot import Chatbot
+from alba.database import Database
 
 router = APIRouter(prefix="/documents", tags=["document"])
 
 
 @router.post("")
-def add_document(files: list[UploadFile], request: Request):
-    chatbot: Chatbot = request.app.state.chatbot
-
+@inject
+def add_document(files: list[UploadFile], db: Annotated[Database, Provide["db"]]):
     try:
-        chatbot.long_term_mem.db.add_documents(files)
+        db.add_documents(files)
     except Exception:
         return {"message": "There was an error while uploading the documents"}
 

@@ -3,7 +3,7 @@ from typing import List, Tuple
 
 from pymilvus.client.abstract import AnnSearchRequest, SearchResult, WeightedRanker
 
-from alba.config import get_config
+from alba.config import Config
 from alba.database import Database
 from alba.document_engine import Document
 from alba.utils.ner_extraction import EntityExtractor
@@ -14,17 +14,17 @@ setup_logging()
 
 
 class LongTermMemory:
-    def __init__(self):
-        self.config = get_config()
+    def __init__(self, config: Config, ner_extractor: EntityExtractor, db: Database):
+        self.config = config
 
-        self.ner_extractor = EntityExtractor(self.config.LOCATIONS_FILE)
+        self.ner_extractor = ner_extractor
 
         # Define the weights for the hybrid search
         self.DENSE_SEARCH_WEIGHT = 0.1
         self.SPARSE_SEARCH_WEIGHT = 0.9
 
         # Create a connection to the database
-        self.db = Database()
+        self.db = db
 
     def get_context(self, query: str, n_docs=2) -> List[Document]:
         """

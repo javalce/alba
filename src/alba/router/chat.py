@@ -1,6 +1,7 @@
-from typing import List
+from typing import Annotated, List
 
-from fastapi import APIRouter, Request
+from dependency_injector.wiring import Provide, inject
+from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -19,9 +20,8 @@ class Messages(BaseModel):
 
 
 @router.post("")
-def chat(data: Messages, request: Request):
-    chatbot: Chatbot = request.app.state.chatbot
-
+@inject
+def chat(data: Messages, chatbot: Annotated[Chatbot, Provide["chatbot"]]):
     message = data.messages[-1]
 
     return StreamingResponse(chatbot.respond_w_sources(message.content))

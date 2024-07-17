@@ -1,5 +1,5 @@
 # Local application imports
-from alba.config import get_config
+from alba.config import Config
 from alba.memory.long_term_memory import LongTermMemory
 from alba.memory.short_term_memory import ShortTermMemory
 from alba.response_engine import ResponseEngine
@@ -11,13 +11,12 @@ class Chatbot:
     A class representing a chatbot that uses long-term and short-term memory to respond to user prompts.
     """
 
-    def __init__(self):
+    def __init__(self, config: Config, long_term_mem: LongTermMemory):
         """
         Initialize the Chatbot object with long-term memory, short-term memory, and a response engine.
         """
-        config = get_config()
 
-        self.long_term_mem = LongTermMemory()
+        self.long_term_mem = long_term_mem
         self.short_term_mem = ShortTermMemory()
         model = config.INFERENCE_MODEL
         self.resp_engine = ResponseEngine(model)

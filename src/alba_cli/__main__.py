@@ -1,3 +1,3 @@
-from alba.cli.cli import main
+from alba_cli.cli import main
 
 main()

@@ -7,7 +7,7 @@ from typing import List, Tuple
 import spacy
 
 # Local application imports
-from alba.config import get_config
+from alba.config import Config
 from spacy.matcher import PhraseMatcher
 
 
@@ -16,7 +16,7 @@ class EntityExtractor:
     A class for extracting entities from text using spaCy and regular expressions.
     """
 
-    def __init__(self, locations_file: str):
+    def __init__(self, config: Config, locations_file: str):
         """
         Initialize the EntityExtractor with a spaCy model, location matcher, and regex patterns.
 
@@ -24,7 +24,7 @@ class EntityExtractor:
             locations_file (str): Path to the JSON file containing location data.
         """
         # Load spaCy model
-        false_positives_file = get_config().FALSE_POSITIVES_FILE
+        false_positives_file = config.FALSE_POSITIVES_FILE
         self.nlp = spacy.load("es_core_news_lg")
 
         # Initialize PhraseMatcher

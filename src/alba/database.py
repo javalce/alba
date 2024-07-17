@@ -11,8 +11,9 @@ from pymilvus import Collection, DataType, FieldSchema, MilvusClient, connection
 from pymilvus.orm.schema import CollectionSchema
 from tqdm import tqdm
 
-from alba.config import get_config
+from alba.config import Config
 from alba.document_engine import Document, DocumentEngine
+from alba.utils.ner_extraction import EntityExtractor
 from alba.utils.utils import setup_logging
 
 # Setup logging
@@ -23,10 +24,17 @@ CHUNKS_COLLECTION_NAME = "chunks"
 
 
 class Database:
-    def __init__(self):
-        self.config = get_config()
+    def __init__(
+        self,
+        config: Config,
+        document_engine: DocumentEngine,
+        ner_extractor: EntityExtractor,
+    ):
+        self.config = config
         self.__client = self.__connect()
-        self.__doc_engine = DocumentEngine()
+        self.__doc_engine = document_engine
+
+        self.ner_extractor = ner_extractor
 
         self.__dense_ef = self.__load_dense_embedding()
         self.__sparse_ef = self.__load_sparse_embedding()

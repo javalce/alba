@@ -8,7 +8,7 @@ __pycache__/
 
 # Poetry specific
 .poetry-env/
-poetry.lock
+#poetry.lock
 
 # Virtual environment
 venv/
@@ -31,4 +31,3 @@ db/
 *.xlsx
 *.blob
 *temp.py
-

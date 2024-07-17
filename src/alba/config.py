@@ -2,14 +2,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Union
 
-from kink import inject
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-@inject
 class Config(BaseSettings):
     """
     A class for managing configuration settings.

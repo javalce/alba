@@ -11,7 +11,7 @@ from alba.utils.ner_extraction import EntityExtractor
 class Container(containers.DeclarativeContainer):
     wiring_config = containers.WiringConfiguration(packages=["alba.router"])
 
-    config = providers.Configuration(pydantic_settings=[Config])
+    config = providers.Singleton(Config)
 
     ner_extractor = providers.Singleton(EntityExtractor, config=config)
 

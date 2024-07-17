@@ -1,4 +1,5 @@
 import uvicorn
+from alba.container import Container
 from rich import print
 from rich.padding import Padding
 from rich.panel import Panel
@@ -70,4 +71,7 @@ def run():
 
 
 def main():
+    container = Container()
+    container.wire(modules=["alba_cli.database"])
+
     app()

@@ -13,7 +13,11 @@ class Container(containers.DeclarativeContainer):
 
     config = providers.Singleton(Config)
 
-    ner_extractor = providers.Singleton(EntityExtractor, config=config)
+    ner_extractor = providers.Singleton(
+        EntityExtractor,
+        config=config,
+        locations_file=config.provided.LOCATIONS_FILE,
+    )
 
     document_engine = providers.Singleton(DocumentEngine, config=config)
 

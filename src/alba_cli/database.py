@@ -2,9 +2,12 @@ from pathlib import Path
 from typing import Annotated
 
 from alba.database import Database
+from dependency_injector.wiring import Provide
 from typer import Argument, Typer
 
 app = Typer(rich_markup_mode="rich")
+
+db: Database = Provide["db"]
 
 
 @app.command("init")
@@ -12,7 +15,6 @@ def initialize_database_schema():
     """
     Creates the milvus database schema.
     """
-    db = Database()
     db.initialize()
 
 
@@ -21,7 +23,6 @@ def clear_database_schema():
     """
     Drops the milvus database schema.
     """
-    db = Database()
     db.clear_database()
 
 
@@ -45,5 +46,4 @@ def add_document(
     """
     files = [str(file) for file in files]
 
-    db = Database()
     db.add_documents(files)

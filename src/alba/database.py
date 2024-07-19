@@ -7,7 +7,7 @@ import nltk
 from milvus_model.hybrid import BGEM3EmbeddingFunction
 from milvus_model.sparse import BM25EmbeddingFunction
 from milvus_model.sparse.bm25.tokenizers import build_default_analyzer
-from pymilvus import Collection, DataType, FieldSchema, MilvusClient, connections
+from pymilvus import Collection, DataType, FieldSchema, MilvusClient
 from pymilvus.orm.schema import CollectionSchema
 from tqdm import tqdm
 
@@ -97,7 +97,6 @@ class Database:
     def __connect(self):
         host = self.config.MILVUS_HOST
         port = self.config.MILVUS_PORT
-        connections.connect(host=host, port=port)
         client = MilvusClient(host=host, port=port)
         return client
 
@@ -196,6 +195,8 @@ class Database:
             index_params=index_params,  # Now passing a list of dictionaries
         )
 
+        logging.info("Created documents schema and index.")
+
     def __create_chunks_schema(self) -> CollectionSchema:
         schema = self.__get_chunks_schema()
         self.__client.create_collection(collection_name=CHUNKS_COLLECTION_NAME, schema=schema)
@@ -224,6 +225,8 @@ class Database:
             collection_name=CHUNKS_COLLECTION_NAME,
             index_params=index_params,  # Pass the list of dictionaries as index_params
         )
+
+        logging.info("Created chunks schema and indexes.")
 
     def initialize(self):
         self.__create_docs_schema()

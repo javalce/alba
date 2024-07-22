@@ -1,5 +1,7 @@
+from typing import Annotated
+
 from dependency_injector.wiring import Provide, inject
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from alba.database import Database
@@ -14,7 +16,10 @@ router = APIRouter(prefix="/documents", tags=["document"])
 
 @router.post("", responses={500: {"description": "Internal server error"}})
 @inject
-def add_document(files: list[UploadFile], db: Database = Depends(Provide["db"])):
+def add_document(
+    files: Annotated[list[UploadFile], File(description="List of files to upload")],
+    db: Database = Depends(Provide["db"]),
+):
     try:
         db.add_documents([file.file for file in files])
     except Exception as e:

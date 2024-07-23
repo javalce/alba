@@ -1,3 +1,4 @@
+import copy
 from typing import Annotated
 
 from dependency_injector.wiring import Provide, inject
@@ -15,12 +16,9 @@ router = APIRouter(prefix="/documents", tags=["document"])
 
 
 @inject
-async def add_documents_to_db(
-    files: list[UploadFile],
-    db: Database = Depends(Provide["db"]),
-):
+def add_documents_to_db(files: list[UploadFile], db: Database = Provide["db"]):
     # TODO: Send email to the user to notify if the documents are uploaded or there was an error
-    db.add_documents([file.file for file in files])
+    db.add_documents([(file.file, file.filename) for file in files])
 
 
 @router.post("")
@@ -29,8 +27,7 @@ async def add_document(
     files: Annotated[list[UploadFile], File(description="List of files to upload")],
     backgound_tasks: BackgroundTasks,
 ):
-
-    backgound_tasks.add_task(add_documents_to_db, files)
+    backgound_tasks.add_task(add_documents_to_db, files=copy.deepcopy(files))
 
     return ResponseMessage(
         message=f"Adding {[file.filename for file in files]} documents. You will be notified once the documents are uploaded"

@@ -1,6 +1,7 @@
 # Standard library imports
 import re
 from dataclasses import dataclass, field
+from tempfile import SpooledTemporaryFile
 from typing import List
 
 # Third-party imports
@@ -125,7 +126,9 @@ class DocumentEngine:
 
         return doc
 
-    def _docs_from_decree_files(self, files: List[str]) -> List[Document]:
+    def _docs_from_decree_files(
+        self, files: List[str | tuple[SpooledTemporaryFile, str]]
+    ) -> List[Document]:
         """
         Generate a list of Document objects from decree files.
 
@@ -141,9 +144,14 @@ class DocumentEngine:
         )
         previous_decree_number = None  # Track the decree number across pages
 
-        for file_path in files:
-            pdf = fitz.open(file_path)
-            for page_num in tqdm(range(len(pdf)), desc=f"Processing {file_path}"):
+        for file in files:
+            if isinstance(file, tuple):
+                f, filename = file
+                pdf = fitz.open(stream=f.read(), filename=filename)
+            else:
+                pdf = fitz.open(file)
+                filename = file
+            for page_num in tqdm(range(len(pdf)), desc=f"Processing {filename}"):
                 raw_text = pdf[page_num].get_text("text")
                 text = self._clean_text(raw_text)
 

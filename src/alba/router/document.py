@@ -14,6 +14,7 @@ class ResponseMessage(BaseModel):
 router = APIRouter(prefix="/documents", tags=["document"])
 
 
+@inject
 async def add_documents_to_db(
     files: list[UploadFile],
     db: Database = Depends(Provide["db"]),
@@ -22,7 +23,7 @@ async def add_documents_to_db(
     db.add_documents([file.file for file in files])
 
 
-@router.post("", responses={500: {"description": "Internal server error"}})
+@router.post("")
 @inject
 async def add_document(
     files: Annotated[list[UploadFile], File(description="List of files to upload")],
@@ -31,7 +32,9 @@ async def add_document(
 
     backgound_tasks.add_task(add_documents_to_db, files)
 
-    return ResponseMessage(message=f"Adding {[file.filename for file in files]} documents")
+    return ResponseMessage(
+        message=f"Adding {[file.filename for file in files]} documents. You will be notified once the documents are uploaded"
+    )
 
 
 @router.post("/reset", responses={500: {"description": "Internal server error"}})

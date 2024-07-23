@@ -21,7 +21,7 @@ class Messages(BaseModel):
 
 @router.post("")
 @inject
-def chat(data: Messages, chatbot: Chatbot = Depends(Provide["chatbot"])):
+async def chat(data: Messages, chatbot: Chatbot = Depends(Provide["chatbot"])):
     message = data.messages[-1]
 
     return StreamingResponse(chatbot.respond_w_sources(message.content))

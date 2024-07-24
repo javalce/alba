@@ -24,7 +24,7 @@ class Container(containers.DeclarativeContainer):
 
     db = providers.Singleton(DatabaseManager, db_url=config.provided.DB_URL)
 
-    document_repository = providers.Singleton(DocumentRepository, db=db)
+    document_repository = providers.Singleton(DocumentRepository)
 
     document_service = providers.Singleton(DocumentService, repository=document_repository)
 

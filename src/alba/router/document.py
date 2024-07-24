@@ -23,9 +23,11 @@ def add_documents_to_db(
     milvus_db: MilvusDatabase = Provide["milvus_db"],
 ):
     files = [file for file in files if not document_service.verify_document(file)]
-    document_service.add_documents(files)
-    # TODO: Send email to the user to notify if the documents are uploaded or there was an error
-    milvus_db.add_documents([(file.file, file.filename) for file in files])
+    if files:
+        # TODO: Send email to the user to notify if the documents are uploaded or there was an error
+
+        document_service.add_documents(files)
+        milvus_db.add_documents([(file.file, file.filename) for file in files])
 
 
 @router.post("")

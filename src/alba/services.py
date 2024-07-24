@@ -24,6 +24,7 @@ class DocumentService:
         else:
             f = file.file
             data = f.read()
+            f.seek(0)
 
         return hashlib.sha256(data).hexdigest()
 

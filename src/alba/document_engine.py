@@ -147,7 +147,9 @@ class DocumentEngine:
         for file in files:
             if isinstance(file, tuple):
                 f, filename = file
-                pdf = fitz.open(stream=f.read(), filename=filename)
+                data = f.read()
+                f.seek(0)
+                pdf = fitz.open(stream=data, filename=filename)
             else:
                 pdf = fitz.open(file)
                 filename = file

@@ -8,7 +8,7 @@ import nltk
 from milvus_model.hybrid import BGEM3EmbeddingFunction
 from milvus_model.sparse import BM25EmbeddingFunction
 from milvus_model.sparse.bm25.tokenizers import build_default_analyzer
-from pymilvus import Collection, DataType, FieldSchema, MilvusClient
+from pymilvus import Collection, DataType, FieldSchema, MilvusClient, connections
 from pymilvus.orm.schema import CollectionSchema
 from tqdm import tqdm
 
@@ -98,6 +98,7 @@ class Database:
     def __connect(self):
         host = self.config.MILVUS_HOST
         port = self.config.MILVUS_PORT
+        connections.connect(host=host, port=port)
         client = MilvusClient(host=host, port=port)
         return client
 

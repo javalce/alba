@@ -6,6 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Up
 from pydantic import BaseModel
 
 from alba.milvus_database import MilvusDatabase
+from alba.services import DocumentService
 
 
 class ResponseMessage(BaseModel):
@@ -16,9 +17,15 @@ router = APIRouter(prefix="/documents", tags=["document"])
 
 
 @inject
-def add_documents_to_db(files: list[UploadFile], db: MilvusDatabase = Provide["db"]):
+def add_documents_to_db(
+    files: list[UploadFile],
+    document_service: DocumentService = Provide["document_service"],
+    milvus_db: MilvusDatabase = Provide["milvus_db"],
+):
+    files = [file for file in files if not document_service.verify_document(file)]
+    document_service.add_documents(files)
     # TODO: Send email to the user to notify if the documents are uploaded or there was an error
-    db.add_documents([(file.file, file.filename) for file in files])
+    milvus_db.add_documents([(file.file, file.filename) for file in files])
 
 
 @router.post("")
@@ -36,7 +43,7 @@ async def add_document(
 
 @router.post("/reset", responses={500: {"description": "Internal server error"}})
 @inject
-async def reset_documents(db: MilvusDatabase = Depends(Provide["db"])):
+async def reset_documents(db: MilvusDatabase = Depends(Provide["milvus_db"])):
     try:
         db.clear_database()
         db.initialize()

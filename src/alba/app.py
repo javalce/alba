@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy_toolkit.ext.fastapi import SQLAlchemyMiddleware
 
 from alba.container import Container
 from alba.router import chat_router, document_router
@@ -12,6 +13,11 @@ def create_app():
         title="Alba - Asistente de Búsqueda Local y Privado",
     )
     app.state.container = container
+
+    app.add_middleware(
+        SQLAlchemyMiddleware,
+        db=container.db(),
+    )
 
     app.add_middleware(
         CORSMiddleware,

@@ -1649,8 +1649,8 @@ files = [
 [package.dependencies]
 orjson = ">=3.9.14,<4.0.0"
 pydantic = [
-    {version = ">=1,<3", markers = "python_full_version < \"3.12.4\""},
     {version = ">=2.7.4,<3.0.0", markers = "python_full_version >= \"3.12.4\""},
+    {version = ">=1,<3", markers = "python_full_version < \"3.12.4\""},
 ]
 requests = ">=2,<3"
 
@@ -2644,8 +2644,8 @@ files = [
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.23.5", markers = "python_version >= \"3.11\" and python_version < \"3.12\""},
     {version = ">=1.26.0", markers = "python_version >= \"3.12\""},
+    {version = ">=1.23.5", markers = "python_version >= \"3.11\" and python_version < \"3.12\""},
 ]
 
 [[package]]
@@ -2773,8 +2773,8 @@ files = [
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.23.2", markers = "python_version == \"3.11\""},
     {version = ">=1.26.0", markers = "python_version >= \"3.12\""},
+    {version = ">=1.23.2", markers = "python_version == \"3.11\""},
 ]
 python-dateutil = ">=2.8.2"
 pytz = ">=2020.1"
@@ -3121,8 +3121,8 @@ files = [
 annotated-types = ">=0.4.0"
 pydantic-core = "2.20.1"
 typing-extensions = [
-    {version = ">=4.6.1", markers = "python_version < \"3.13\""},
     {version = ">=4.12.2", markers = "python_version >= \"3.13\""},
+    {version = ">=4.6.1", markers = "python_version < \"3.13\""},
 ]
 
 [package.extras]
@@ -4157,6 +4157,20 @@ postgresql-psycopg2cffi = ["psycopg2cffi"]
 postgresql-psycopgbinary = ["psycopg[binary] (>=3.0.7)"]
 pymysql = ["pymysql"]
 sqlcipher = ["sqlcipher3_binary"]
+
+[[package]]
+name = "sqlalchemy-toolkit"
+version = "0.1.0"
+description = "Simplify SQLAlchemy 2.0+ usage."
+optional = false
+python-versions = "<4.0,>=3.8"
+files = [
+    {file = "sqlalchemy_toolkit-0.1.0-py3-none-any.whl", hash = "sha256:0d220badc6695a7ce3f2c077ef1f421c067a7ca5dfd36ab4379a48bf021c8613"},
+    {file = "sqlalchemy_toolkit-0.1.0.tar.gz", hash = "sha256:5adc5938103e7db2751163f8f22572e4438c809862432822c2a86c3f7d730cf6"},
+]
+
+[package.dependencies]
+sqlalchemy = ">=2.0.0,<2.1.0"
 
 [[package]]
 name = "srsly"
@@ -5385,4 +5399,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "f155c72f58b9dba2fd604f3a14b070565afed2fc17e3ef545957a66944357570"
+content-hash = "2408efdb6828ae103a5004a3aaa1840b885f8012547ace8edbf540ea7db8a2d8"

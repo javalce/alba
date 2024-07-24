@@ -32,6 +32,8 @@ ghostscript = "^0.7"
 pydantic-settings = "^2.3.4"
 fastapi = "^0.111.1"
 dependency-injector2 = "^4.41.1"
+sqlalchemy = "^2.0.31"
+sqlalchemy-toolkit = "^0.1.0"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.5.2"

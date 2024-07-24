@@ -1,13 +1,13 @@
 from pathlib import Path
 from typing import Annotated
 
-from alba.database import Database
+from alba.milvus_database import MilvusDatabase
 from dependency_injector.wiring import Provide
 from typer import Argument, Typer
 
 app = Typer(rich_markup_mode="rich")
 
-db: Database = Provide["db"]
+db: MilvusDatabase = Provide["db"]
 
 
 @app.command("init")

@@ -5,7 +5,7 @@ from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from alba.database import Database
+from alba.milvus_database import MilvusDatabase
 
 
 class ResponseMessage(BaseModel):
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/documents", tags=["document"])
 
 
 @inject
-def add_documents_to_db(files: list[UploadFile], db: Database = Provide["db"]):
+def add_documents_to_db(files: list[UploadFile], db: MilvusDatabase = Provide["db"]):
     # TODO: Send email to the user to notify if the documents are uploaded or there was an error
     db.add_documents([(file.file, file.filename) for file in files])
 
@@ -36,7 +36,7 @@ async def add_document(
 
 @router.post("/reset", responses={500: {"description": "Internal server error"}})
 @inject
-async def reset_documents(db: Database = Depends(Provide["db"])):
+async def reset_documents(db: MilvusDatabase = Depends(Provide["db"])):
     try:
         db.clear_database()
         db.initialize()

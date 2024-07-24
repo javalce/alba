@@ -24,7 +24,7 @@ DOCS_COLLECTION_NAME = "docs"
 CHUNKS_COLLECTION_NAME = "chunks"
 
 
-class Database:
+class MilvusDatabase:
     def __init__(
         self,
         config: Config,

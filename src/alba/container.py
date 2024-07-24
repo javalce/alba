@@ -2,9 +2,9 @@ from dependency_injector import containers, providers
 
 from alba.chatbot import Chatbot
 from alba.config import Config
-from alba.database import Database
 from alba.document_engine import DocumentEngine
 from alba.memory.long_term_memory import LongTermMemory
+from alba.milvus_database import MilvusDatabase
 from alba.utils.ner_extraction import EntityExtractor
 
 
@@ -22,7 +22,7 @@ class Container(containers.DeclarativeContainer):
     document_engine = providers.Singleton(DocumentEngine, config=config)
 
     db = providers.Singleton(
-        Database,
+        MilvusDatabase,
         config=config,
         document_engine=document_engine,
         ner_extractor=ner_extractor,

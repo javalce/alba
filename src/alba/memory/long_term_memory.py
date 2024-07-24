@@ -4,8 +4,8 @@ from typing import List, Tuple
 from pymilvus.client.abstract import AnnSearchRequest, SearchResult, WeightedRanker
 
 from alba.config import Config
-from alba.database import Database
 from alba.document_engine import Document
+from alba.milvus_database import MilvusDatabase
 from alba.utils.ner_extraction import EntityExtractor
 from alba.utils.utils import setup_logging
 
@@ -14,7 +14,7 @@ setup_logging()
 
 
 class LongTermMemory:
-    def __init__(self, config: Config, ner_extractor: EntityExtractor, db: Database):
+    def __init__(self, config: Config, ner_extractor: EntityExtractor, db: MilvusDatabase):
         self.config = config
 
         self.ner_extractor = ner_extractor

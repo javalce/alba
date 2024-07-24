@@ -5,7 +5,8 @@ from typing import Union
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+# Retrieve the base directory of the project
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 
 class Config(BaseSettings):

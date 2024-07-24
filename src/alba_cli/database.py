@@ -10,11 +10,6 @@ from typer import Argument, Typer
 app = Typer(rich_markup_mode="rich")
 
 
-db: DatabaseManager = Provide["db"]
-document_service = Provide["document_service"]
-milvus_db: MilvusDatabase = Provide["milvus_db"]
-
-
 @inject
 def __init_database(
     db: DatabaseManager = Provide["db"],

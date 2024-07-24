@@ -31,3 +31,8 @@ db/
 *.xlsx
 *.blob
 *temp.py
+
+# sqlite database files
+*.sqlite3
+*.sqlite
+*.db

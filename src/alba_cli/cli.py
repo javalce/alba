@@ -74,6 +74,6 @@ def run():
 
 def main():
     container = Container()
-    container.wire(modules=["alba_cli.database"])
+    container.wire(modules=["alba_cli.database", "alba_cli.document"])
 
     app()

@@ -58,7 +58,7 @@ def add_document(
     __add_document(files)
 
 
-@app.command("clear")
+@app.command("clean")
 def remove_documents():
     """
     Removes all documents from the database.

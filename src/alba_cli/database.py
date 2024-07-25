@@ -1,11 +1,7 @@
-from pathlib import Path
-from typing import Annotated
-
 from alba.milvus_database import MilvusDatabase
-from alba.services import DocumentService
 from dependency_injector.wiring import Provide, inject
 from sqlalchemy_toolkit import DatabaseManager, Entity
-from typer import Argument, Typer
+from typer import Typer
 
 app = Typer(rich_markup_mode="rich")
 
@@ -28,21 +24,10 @@ def __clear_database(
     milvus_db.clear_database()
 
 
-@inject
-def __add_document(
-    files: list[str],
-    document_service: DocumentService = Provide["document_service"],
-    milvus_db: MilvusDatabase = Provide["milvus_db"],
-):
-    files = [file for file in files if not document_service.verify_document(file)]
-    document_service.add_documents(files)
-    milvus_db.add_documents(files)
-
-
 @app.command("init")
 def initialize_database():
     """
-    Creates the milvus database schema.
+    Creates the database schema.
     """
     __init_database()
 
@@ -50,37 +35,15 @@ def initialize_database():
 @app.command("drop")
 def clear_database():
     """
-    Drops the milvus database schema.
+    Drops the database schema.
     """
     __clear_database()
-
-
-@app.command("add")
-def add_document(
-    files: Annotated[
-        list[Path],
-        Argument(
-            help="The file paths to the document to be added.",
-            exists=True,
-            file_okay=True,
-            dir_okay=False,
-            writable=False,
-            readable=True,
-            resolve_path=True,
-        ),
-    ]
-):
-    """
-    Adds a document to the database.
-    """
-    files = [str(file) for file in files]
-    __add_document(files)
 
 
 @app.command("reset")
 def reset_database():
     """
-    Resets the database.
+    Drops and recreates the database schema. [red]This will delete all data in the database.[/ red]
     """
     __clear_database()
     __init_database()

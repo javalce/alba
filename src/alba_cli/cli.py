@@ -6,6 +6,7 @@ from rich.panel import Panel
 from typer import Typer
 
 from alba_cli.database import app as db_app
+from alba_cli.document import app as document_app
 
 from .logging import setup_logging
 
@@ -14,6 +15,7 @@ setup_logging()
 app = Typer(rich_markup_mode="rich")
 
 app.add_typer(db_app, name="db", help="Database management commands.")
+app.add_typer(document_app, name="document", help="Document management commands.")
 
 
 def _run(command: str, reload: bool = True):

@@ -1,4 +1,5 @@
 import copy
+import uuid
 from typing import Annotated, Any
 
 from dependency_injector.wiring import Provide, inject
@@ -18,7 +19,7 @@ class DocumentResponse(BaseModel):
         populate_by_name=True,
         from_attributes=True,
     )
-    id: int
+    id: uuid.UUID
     name: str
 
 

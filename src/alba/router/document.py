@@ -60,10 +60,14 @@ def add_document(
 
 @router.post("/reset", responses={500: {"description": "Internal server error"}})
 @inject
-def reset_documents(db: MilvusDatabase = Depends(Provide["milvus_db"])):
+def reset_documents(
+    document_service: DocumentService = Depends(Provide["document_service"]),
+    milvus_db: MilvusDatabase = Depends(Provide["milvus_db"]),
+):
     try:
-        db.clear_database()
-        db.initialize()
+        document_service.delete_all()
+        milvus_db.clear_database()
+        milvus_db.initialize()
     except Exception as e:
         raise HTTPException(
             status_code=500, detail="There was an error while resetting the documents"

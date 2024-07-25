@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy_toolkit import SQLAlchemyRepository
 
 from alba import models
@@ -14,3 +14,9 @@ class DocumentRepository(SQLAlchemyRepository[models.Document, int]):
     def find_by_hash(self, hash_value: str):
         query = select(self.entity_class).where(self.entity_class.hash_value == hash_value)
         return self.session.execute(query).scalar_one_or_none()
+
+    def delete_all(self):
+        query = delete(self.entity_class)
+
+        self.session.execute(query)
+        self.session.commit()

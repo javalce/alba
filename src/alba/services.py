@@ -36,3 +36,6 @@ class DocumentService:
         document = self.repository.find_by_hash(sha256_returned)
 
         return document is not None
+
+    def delete_all(self):
+        self.repository.delete_all()

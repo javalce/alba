@@ -1,9 +1,9 @@
 import copy
-from typing import Annotated
+from typing import Annotated, Any
 
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from alba.milvus_database import MilvusDatabase
 from alba.services import DocumentService
@@ -14,6 +14,10 @@ class ResponseMessage(BaseModel):
 
 
 class DocumentResponse(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+        from_attributes=True,
+    )
     id: int
     name: str
 
@@ -35,9 +39,9 @@ def add_documents_to_db(
         milvus_db.add_documents([(file.file, file.filename) for file in files])
 
 
-@router.get("", response_class=list[DocumentResponse])
+@router.get("", response_model=list[DocumentResponse])
 @inject
-def get_documents(document_service: DocumentService = Depends(Provide["document_service"])):
+def get_documents(document_service: DocumentService = Depends(Provide["document_service"])) -> Any:
     return document_service.find_all()
 
 

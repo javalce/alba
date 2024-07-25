@@ -20,3 +20,7 @@ class DocumentRepository(SQLAlchemyRepository[models.Document, int]):
 
         self.session.execute(query)
         self.session.commit()
+
+    def find_all_by_name(self, name: str):
+        query = select(self.entity_class).where(self.entity_class.name.ilike(f"%{name}%"))
+        return self.session.execute(query).scalars().all()

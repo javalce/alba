@@ -13,6 +13,9 @@ class DocumentService:
     def find_all(self):
         return self.repository.find_all()
 
+    def find_all_by_name(self, name: str):
+        return self.repository.find_all_by_name(name)
+
     def add_documents(self, files: list[UploadFile | str]):
         documents = [
             models.Document(name=file.filename, hash_value=self.create_sha256(file))

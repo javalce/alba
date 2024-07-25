@@ -42,7 +42,13 @@ def add_documents_to_db(
 
 @router.get("", response_model=list[DocumentResponse])
 @inject
-def get_documents(document_service: DocumentService = Depends(Provide["document_service"])) -> Any:
+def get_documents(
+    name: str | None = None,
+    document_service: DocumentService = Depends(Provide["document_service"]),
+) -> Any:
+    if name:
+        return document_service.find_all_by_name(name)
+
     return document_service.find_all()
 
 

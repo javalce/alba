@@ -10,6 +10,9 @@ class DocumentService:
     def __init__(self, repository: repositories.DocumentRepository):
         self.repository = repository
 
+    def find_all(self):
+        return self.repository.find_all()
+
     def add_documents(self, files: list[UploadFile | str]):
         documents = [
             models.Document(name=file.filename, hash_value=self.create_sha256(file))

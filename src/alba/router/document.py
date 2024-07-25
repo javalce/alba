@@ -13,6 +13,11 @@ class ResponseMessage(BaseModel):
     message: str
 
 
+class DocumentResponse(BaseModel):
+    id: int
+    name: str
+
+
 router = APIRouter(prefix="/documents", tags=["document"])
 
 
@@ -30,9 +35,15 @@ def add_documents_to_db(
         milvus_db.add_documents([(file.file, file.filename) for file in files])
 
 
+@router.get("", response_class=list[DocumentResponse])
+@inject
+def get_documents(document_service: DocumentService = Depends(Provide["document_service"])):
+    return document_service.find_all()
+
+
 @router.post("")
 @inject
-async def add_document(
+def add_document(
     files: Annotated[list[UploadFile], File(description="List of files to upload")],
     backgound_tasks: BackgroundTasks,
 ):
@@ -45,7 +56,7 @@ async def add_document(
 
 @router.post("/reset", responses={500: {"description": "Internal server error"}})
 @inject
-async def reset_documents(db: MilvusDatabase = Depends(Provide["milvus_db"])):
+def reset_documents(db: MilvusDatabase = Depends(Provide["milvus_db"])):
     try:
         db.clear_database()
         db.initialize()

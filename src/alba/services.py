@@ -17,6 +17,11 @@ class DocumentService:
     def find_all_with_number_of_decrees(self):
         return self.repository.find_all_with_number_of_decrees()
 
+    def add_document(self, file: UploadFile):
+        document = models.Document.create_document(file)
+
+        return self.repository.save(document)
+
     def add_documents(self, files: list[UploadFile | str]):
         documents = [models.Document.create_document(file) for file in files]
         self.repository.save_all(documents)

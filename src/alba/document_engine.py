@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 # Local application imports
 from alba.config import Config
+from alba.services import DocumentService
 from alba.utils.utils import setup_logging
 
 setup_logging()
@@ -36,11 +37,12 @@ class DocumentEngine:
     A class for processing and generating documents from various file types.
     """
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, document_service: DocumentService):
         """
         Initialize the DocumentEngine object with configuration settings.
         """
         self.config = config
+        self.document_service = document_service
 
     def _identify_decree_type(self, text: str) -> str:
         """
@@ -153,6 +155,9 @@ class DocumentEngine:
             else:
                 pdf = fitz.open(file)
                 filename = file
+
+            document = self.document_service.add_document(file)
+
             for page_num in tqdm(range(len(pdf)), desc=f"Processing {filename}"):
                 raw_text = pdf[page_num].get_text("text")
                 text = self._clean_text(raw_text)

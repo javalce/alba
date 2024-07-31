@@ -31,16 +31,21 @@ class DocumentRepository(SQLAlchemyRepository[models.Document, int]):
             )
             .where(self.entity_class.name.ilike(f"%{name}%"))
             .join_from(self.entity_class, models.Decree)
+            .group_by(self.entity_class.id)
         )
 
         return self.session.execute(query).mappings().all()
 
     def find_all_with_number_of_decrees(self):
-        query = select(
-            self.entity_class.id.label("id"),
-            self.entity_class.name.label("name"),
-            func.count(models.Decree.id).label("total"),
-        ).join_from(self.entity_class, models.Decree)
+        query = (
+            select(
+                self.entity_class.id.label("id"),
+                self.entity_class.name.label("name"),
+                func.count(models.Decree.id).label("total"),
+            )
+            .join_from(self.entity_class, models.Decree)
+            .group_by(self.entity_class.id)
+        )
 
         return self.session.execute(query).mappings().all()
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import os
 import uuid
 
 from fastapi import UploadFile
@@ -31,7 +32,7 @@ class Document(Entity):
             text = f.read()
 
         return cls(
-            name=filepath,
+            name=os.path.basename(filepath),
             hash_value=cls.generate_sha256(text),
         )
 

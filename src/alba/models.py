@@ -56,6 +56,11 @@ class Document(Entity):
 
 class Decree(Entity):
     __tablename__ = "decrees"
+    __table_args__ = (
+        {
+            "sqlite_autoincrement": True,
+        },
+    )
 
     id: Mapped[int] = mapped_column(
         "id", Integer, primary_key=True, nullable=False, autoincrement=True

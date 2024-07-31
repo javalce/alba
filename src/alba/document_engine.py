@@ -2,11 +2,12 @@
 import datetime
 import re
 from dataclasses import dataclass, field
-from tempfile import SpooledTemporaryFile
 from typing import List
 
-# Third-party imports
 import fitz  # PyMuPDF
+
+# Third-party imports
+from fastapi import UploadFile
 from tqdm import tqdm
 
 # Local application imports
@@ -133,9 +134,7 @@ class DocumentEngine:
 
         return doc
 
-    def _docs_from_decree_files(
-        self, files: List[str | tuple[SpooledTemporaryFile, str]]
-    ) -> List[Document]:
+    def _docs_from_decree_files(self, files: List[str | UploadFile]) -> List[Document]:
         """
         Generate a list of Document objects from decree files.
 
@@ -152,19 +151,18 @@ class DocumentEngine:
         previous_decree_number = None  # Track the decree number across pages
 
         for file in files:
-            if isinstance(file, tuple):
-                f, filename = file
+            if isinstance(file, str):
+                pdf = fitz.open(file)
+            else:
+                f = file.file
                 data = f.read()
                 f.seek(0)
-                pdf = fitz.open(stream=data, filename=filename)
-            else:
-                pdf = fitz.open(file)
-                filename = file
+                pdf = fitz.open(stream=data, filename=file.filename)
 
             document = self.document_service.add_document(file)
             decrees = []
 
-            for page_num in tqdm(range(len(pdf)), desc=f"Processing {filename}"):
+            for page_num in tqdm(range(len(pdf)), desc=f"Processing {document.name}"):
                 raw_text = pdf[page_num].get_text("text")
                 text = self._clean_text(raw_text)
 

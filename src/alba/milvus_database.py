@@ -1,10 +1,10 @@
 import logging
 import os
 import pickle
-from tempfile import SpooledTemporaryFile
 from typing import Any, Dict, List, Optional
 
 import nltk
+from fastapi import UploadFile
 from milvus_model.hybrid import BGEM3EmbeddingFunction
 from milvus_model.sparse import BM25EmbeddingFunction
 from milvus_model.sparse.bm25.tokenizers import build_default_analyzer
@@ -250,9 +250,7 @@ class MilvusDatabase:
         self.chunks.insert(chunk_records)
         logging.info(f"Inserted {len(chunk_records)} chunk records.")
 
-    def add_documents(
-        self, files: List[str | tuple[SpooledTemporaryFile, str]], type: str = "decrees"
-    ) -> None:
+    def add_documents(self, files: List[str | UploadFile], type: str = "decrees") -> None:
         logging.info(f"Adding documents of type {type} to the database.")
         # Generate documents, format them into database records, and insert them
         documents = self.__doc_engine.generate_documents(files, type)

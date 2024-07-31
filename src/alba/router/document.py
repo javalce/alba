@@ -38,7 +38,6 @@ def add_documents_to_db(
     if files:
         # TODO: Send email to the user to notify if the documents are uploaded or there was an error
 
-        document_service.add_documents(files)
         milvus_db.add_documents([(file.file, file.filename) for file in files])
 
 

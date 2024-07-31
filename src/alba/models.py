@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import datetime
+import hashlib
 import uuid
 
+from fastapi import UploadFile
 from sqlalchemy import UUID, Date, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy_toolkit import Entity
@@ -15,7 +19,39 @@ class Document(Entity):
     name: Mapped[str] = mapped_column("name", String(255), nullable=False, index=True)
     hash_value: Mapped[str] = mapped_column("hash_value", Text, nullable=False, index=True)
 
-    decrees: Mapped[list["Decree"]] = relationship()
+    decrees: Mapped[list[Decree]] = relationship()
+
+    @classmethod
+    def generate_sha256(cls, text: bytes):
+        return hashlib.sha256(text).hexdigest()
+
+    @classmethod
+    def from_filepath(cls, filepath: str):
+        with open(filepath, "rb") as f:
+            text = f.read()
+
+        return cls(
+            name=filepath,
+            hash_value=cls.generate_sha256(text),
+        )
+
+    @classmethod
+    def from_upload_file(cls, file: UploadFile):
+        f = file.file
+        text = f.read()
+        f.seek(0)
+
+        return cls(
+            name=file.filename,
+            hash_value=cls.generate_sha256(text),
+        )
+
+    @classmethod
+    def create_document(cls, file: UploadFile | str):
+        if isinstance(file, str):
+            return cls.from_filepath(file)
+
+        return cls.from_upload_file(file)
 
 
 class Decree(Entity):

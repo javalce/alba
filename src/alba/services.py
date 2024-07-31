@@ -34,3 +34,11 @@ class DocumentService:
 
     def delete_all(self):
         self.repository.delete_all()
+
+
+class DecreeService:
+    def __init__(self, repository: repositories.DecreeRepository):
+        self.repository = repository
+
+    def add_decrees(self, decrees: list[models.Decree]):
+        self.repository.save_all(decrees)

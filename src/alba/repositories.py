@@ -43,3 +43,7 @@ class DocumentRepository(SQLAlchemyRepository[models.Document, int]):
             .group_by(self.entity_class.id)
         )
         return self.session.execute(query).scalars().all()
+
+
+class DecreeRepository(SQLAlchemyRepository[models.Decree, int]):
+    entity_class = models.Decree

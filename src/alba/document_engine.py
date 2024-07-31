@@ -1,4 +1,5 @@
 # Standard library imports
+import datetime
 import re
 from dataclasses import dataclass, field
 from tempfile import SpooledTemporaryFile
@@ -9,8 +10,9 @@ import fitz  # PyMuPDF
 from tqdm import tqdm
 
 # Local application imports
+from alba import models
 from alba.config import Config
-from alba.services import DocumentService
+from alba.services import DecreeService, DocumentService
 from alba.utils.utils import setup_logging
 
 setup_logging()
@@ -37,12 +39,15 @@ class DocumentEngine:
     A class for processing and generating documents from various file types.
     """
 
-    def __init__(self, config: Config, document_service: DocumentService):
+    def __init__(
+        self, config: Config, document_service: DocumentService, decree_service: DecreeService
+    ):
         """
         Initialize the DocumentEngine object with configuration settings.
         """
         self.config = config
         self.document_service = document_service
+        self.decree_service = decree_service
 
     def _identify_decree_type(self, text: str) -> str:
         """
@@ -157,6 +162,7 @@ class DocumentEngine:
                 filename = file
 
             document = self.document_service.add_document(file)
+            decrees = []
 
             for page_num in tqdm(range(len(pdf)), desc=f"Processing {filename}"):
                 raw_text = pdf[page_num].get_text("text")
@@ -169,6 +175,14 @@ class DocumentEngine:
                     number == previous_decree_number
                 )  # Determine if this page continues the previous decree
 
+                decrees.append(
+                    models.Decree(
+                        number=number,
+                        date=datetime.datetime.strptime(date, "%d/%m/%Y").date(),
+                        document_id=document.id,
+                    )
+                )
+
                 decree_type = self._identify_decree_type(text)
                 if decree_type == "standard":
                     doc = self._parse_standard_decree(
@@ -179,6 +193,8 @@ class DocumentEngine:
 
                 documents.append(doc)
                 previous_decree_number = number
+
+            self.decree_service.add_decrees(decrees)
 
             pdf.close()
         return documents

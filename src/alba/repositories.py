@@ -47,3 +47,7 @@ class DocumentRepository(SQLAlchemyRepository[models.Document, int]):
 
 class DecreeRepository(SQLAlchemyRepository[models.Decree, int]):
     entity_class = models.Decree
+
+    def save_all(self, decrees: list[models.Decree]):
+        self.session.add_all(decrees)
+        self.session.commit()

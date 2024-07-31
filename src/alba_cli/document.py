@@ -15,12 +15,14 @@ app = Typer(rich_markup_mode="rich")
 @inject
 def __add_document(
     files: list[str],
+    db: DatabaseManager = Provide["db"],
     document_service: DocumentService = Provide["document_service"],
     milvus_db: MilvusDatabase = Provide["milvus_db"],
 ):
-    files = [file for file in files if not document_service.verify_document(file)]
-    if files:
-        milvus_db.add_documents(files)
+    with db.session_ctx():
+        files = [file for file in files if not document_service.verify_document(file)]
+        if files:
+            milvus_db.add_documents(files)
 
 
 @inject

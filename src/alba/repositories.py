@@ -13,6 +13,7 @@ class DocumentRepository(SQLAlchemyRepository[models.Document, int]):
 
     def find_by_hash(self, hash_value: str):
         query = select(self.entity_class).where(self.entity_class.hash_value == hash_value)
+
         return self.session.execute(query).scalar_one_or_none()
 
     def delete_all(self):
@@ -24,25 +25,24 @@ class DocumentRepository(SQLAlchemyRepository[models.Document, int]):
     def find_all_by_name(self, name: str):
         query = (
             select(
-                self.entity_class,
+                self.entity_class.id.label("id"),
+                self.entity_class.name.label("name"),
                 func.count(models.Decree.id).label("total"),
             )
             .where(self.entity_class.name.ilike(f"%{name}%"))
-            .join(models.Decree)
-            .group_by(self.entity_class.id)
+            .join_from(self.entity_class, models.Decree)
         )
-        return self.session.execute(query).scalars().all()
+
+        return self.session.execute(query).mappings().all()
 
     def find_all_with_number_of_decrees(self):
-        query = (
-            select(
-                self.entity_class,
-                func.count(models.Decree.id).label("total"),
-            )
-            .join(models.Decree)
-            .group_by(self.entity_class.id)
-        )
-        return self.session.execute(query).scalars().all()
+        query = select(
+            self.entity_class.id.label("id"),
+            self.entity_class.name.label("name"),
+            func.count(models.Decree.id).label("total"),
+        ).join_from(self.entity_class, models.Decree)
+
+        return self.session.execute(query).mappings().all()
 
 
 class DecreeRepository(SQLAlchemyRepository[models.Decree, int]):

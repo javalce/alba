@@ -19,8 +19,8 @@ def __add_document(
     milvus_db: MilvusDatabase = Provide["milvus_db"],
 ):
     files = [file for file in files if not document_service.verify_document(file)]
-    document_service.add_documents(files)
-    milvus_db.add_documents(files)
+    if files:
+        milvus_db.add_documents(files)
 
 
 @inject
@@ -30,6 +30,7 @@ def __purge_documents(
 ):
     with db.session_ctx() as session:
         session.execute(delete(models.Document))
+        session.execute(delete(models.Decree))
         session.commit()
 
     milvus_db.initialize()

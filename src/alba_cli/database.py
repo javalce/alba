@@ -35,7 +35,7 @@ def initialize_database():
 @app.command("drop")
 def clear_database():
     """
-    Drops the database schema.
+    Drops the database schema. [red]This will delete all data in the database.[/ red]
     """
     __clear_database()
 

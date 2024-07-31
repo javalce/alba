@@ -19,8 +19,10 @@ class DocumentResponse(BaseModel):
         populate_by_name=True,
         from_attributes=True,
     )
+
     id: uuid.UUID
     name: str
+    total: int
 
 
 router = APIRouter(prefix="/documents", tags=["document"])
@@ -49,7 +51,7 @@ def get_documents(
     if name:
         return document_service.find_all_by_name(name)
 
-    return document_service.find_all()
+    return document_service.find_all_with_number_of_decrees()
 
 
 @router.post("")

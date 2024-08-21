@@ -14,15 +14,14 @@ app = Typer(rich_markup_mode="rich")
 
 @inject
 def __add_document(
-    files: list[str],
+    file: str,
     db: DatabaseManager = Provide["db"],
     document_service: DocumentService = Provide["document_service"],
     milvus_db: MilvusDatabase = Provide["milvus_db"],
 ):
     with db.session_ctx():
-        files = [file for file in files if not document_service.verify_document(file)]
-        if files:
-            milvus_db.add_documents(files)
+        if not document_service.verify_document(file):
+            milvus_db.add_documents(file)
 
 
 @inject
@@ -41,10 +40,10 @@ def __purge_documents(
 
 @app.command("add")
 def add_document(
-    files: Annotated[
-        list[Path],
+    file: Annotated[
+        Path,
         Argument(
-            help="The file paths to the document to be added.",
+            help="The file path to the document to be added.",
             exists=True,
             file_okay=True,
             dir_okay=False,
@@ -57,8 +56,8 @@ def add_document(
     """
     Adds a document to the database.
     """
-    files = [str(file) for file in files]
-    __add_document(files)
+    file = str(file)
+    __add_document(file)
 
 
 @app.command("clean")

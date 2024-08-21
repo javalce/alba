@@ -30,15 +30,14 @@ router = APIRouter(prefix="/documents", tags=["document"])
 
 @inject
 def add_documents_to_db(
-    files: list[UploadFile],
+    file: UploadFile,
     document_service: DocumentService = Provide["document_service"],
     milvus_db: MilvusDatabase = Provide["milvus_db"],
 ):
-    files = [file for file in files if not document_service.verify_document(file)]
-    if files:
+    if not document_service.verify_document(file):
         # TODO: Send email to the user to notify if the documents are uploaded or there was an error
 
-        milvus_db.add_documents(files)
+        milvus_db.add_documents(file)
 
 
 @router.get("", response_model=list[DocumentResponse])
@@ -56,13 +55,13 @@ def get_documents(
 @router.post("")
 @inject
 def add_document(
-    files: Annotated[list[UploadFile], File(description="List of files to upload")],
+    file: Annotated[UploadFile, File(description="List of files to upload")],
     backgound_tasks: BackgroundTasks,
 ):
-    backgound_tasks.add_task(add_documents_to_db, files=copy.deepcopy(files))
+    backgound_tasks.add_task(add_documents_to_db, file=copy.deepcopy(file))
 
     return ResponseMessage(
-        message=f"Adding {[file.filename for file in files]} documents. You will be notified once the documents are uploaded"
+        message=f"Adding {file.filename} documents. You will be notified once the documents are uploaded"
     )
 
 

@@ -30,7 +30,7 @@ camelot-py = "^0.11.0"
 opencv-python = "^4.10.0.82"
 ghostscript = "^0.7"
 pydantic-settings = "^2.3.4"
-fastapi = "^0.111.1"
+fastapi = { extras = ["standard"], version = "^0.111.1" }
 dependency-injector2 = "^4.41.1"
 sqlalchemy = "^2.0.31"
 sqlalchemy-toolkit = "^0.1.0"

@@ -2,7 +2,8 @@ from typing import Annotated, Any
 
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, Form, HTTPException
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel as PydanticBaseModel
+from pydantic import ConfigDict
 
 from alba.exceptions import InvalidPasswordError, NotFoundError
 from alba.security import (
@@ -13,23 +14,20 @@ from alba.security import (
 from alba.services import UserService
 
 
-class LoginResponse(BaseModel):
+class BaseModel(PydanticBaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
         from_attributes=True,
     )
 
+
+class LoginResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str
 
 
 class RefreshResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-        from_attributes=True,
-    )
-
     access_token: str
     token_type: str
 

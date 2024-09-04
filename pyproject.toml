@@ -11,7 +11,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-langchain = "^0.2.15"
+langchain = "^0.2.16"
 pymilvus = "^2.4.6"
 milvus-model = "^0.2.5"
 pymupdf = "^1.24.10"
@@ -32,11 +32,13 @@ ghostscript = "^0.7"
 pydantic-settings = "^2.4.0"
 fastapi = { extras = ["standard"], version = "^0.112.2" }
 dependency-injector2 = "^4.41.1"
-sqlalchemy = "^2.0.32"
+sqlalchemy = "^2.0.33"
 sqlalchemy-toolkit = "^0.1.1"
 pyjwt = "^2.9.0"
-passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+passlib = { extras = ["bcrypt"], version = "^1.7.4" }
 nltk = "^3.9.1"
+# Pin bcrypt until passlib supports the latest
+bcrypt = "4.0.1"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.6.3"

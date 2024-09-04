@@ -47,7 +47,7 @@ def __generate_token(
 
     return jwt.encode(
         payload,
-        settings.SECRET_KEY,
+        settings.JWT_SECRET_KEY,
         algorithm=settings.JWT_ALGORITHM,
         headers=additional_headers,
     )

@@ -42,7 +42,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def login(
     username: Annotated[str, Form(max_length=255)],
     password: Annotated[str, Form(max_length=255)],
-    user_service: Annotated[UserService, Depends(Provide["user_service"])],
+    user_service: UserService = Depends(Provide["user_service"]),
 ) -> Any:
     try:
         user = user_service.login(username, password)

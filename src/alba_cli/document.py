@@ -1,13 +1,14 @@
 from pathlib import Path
 from typing import Annotated
 
-from alba import models
-from alba.milvus_database import MilvusDatabase
-from alba.services import DocumentService
 from dependency_injector.wiring import Provide, inject
 from sqlalchemy import delete
 from sqlalchemy_toolkit import DatabaseManager
 from typer import Argument, Typer
+
+from alba import models
+from alba.milvus_database import MilvusDatabase
+from alba.services import DocumentService
 
 app = Typer(rich_markup_mode="rich")
 

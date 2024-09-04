@@ -1,7 +1,8 @@
-from alba.milvus_database import MilvusDatabase
 from dependency_injector.wiring import Provide, inject
 from sqlalchemy_toolkit import DatabaseManager, Entity
 from typer import Typer
+
+from alba.milvus_database import MilvusDatabase
 
 app = Typer(rich_markup_mode="rich")
 

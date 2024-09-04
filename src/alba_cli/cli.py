@@ -1,12 +1,13 @@
 import uvicorn
-from alba.container import Container
 from rich import print
 from rich.padding import Padding
 from rich.panel import Panel
 from typer import Typer
 
+from alba.container import Container
 from alba_cli.database import app as db_app
 from alba_cli.document import app as document_app
+from alba_cli.user import app as user_app
 
 from .logging import setup_logging
 
@@ -16,6 +17,7 @@ app = Typer(rich_markup_mode="rich")
 
 app.add_typer(db_app, name="db", help="Database management commands.")
 app.add_typer(document_app, name="document", help="Document management commands.")
+app.add_typer(user_app, name="user", help="User management commands.")
 
 
 def _run(command: str, reload: bool = True):
@@ -74,6 +76,6 @@ def run():
 
 def main():
     container = Container()
-    container.wire(modules=["alba_cli.database", "alba_cli.document"])
+    container.wire(modules=["alba_cli.database", "alba_cli.document", "alba_cli.user"])
 
     app()

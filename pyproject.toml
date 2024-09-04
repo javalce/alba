@@ -36,6 +36,7 @@ sqlalchemy = "^2.0.32"
 sqlalchemy-toolkit = "^0.1.1"
 pyjwt = "^2.9.0"
 passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+nltk = "^3.9.1"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.6.3"

@@ -71,3 +71,13 @@ class Decree(Entity):
     document_id: Mapped[uuid.UUID] = mapped_column(
         "document_id", UUID, ForeignKey("documents.id"), nullable=False
     )
+
+
+class User(Entity):
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", UUID, primary_key=True, nullable=False, default=uuid.uuid4()
+    )
+    username: Mapped[str] = mapped_column("username", String(255), nullable=False, index=True)
+    password: Mapped[str] = mapped_column("password", String(255), nullable=False)

@@ -1,6 +1,8 @@
 from fastapi import UploadFile
 
 from alba import models, repositories
+from alba.exceptions import InvalidPasswordError, NotFoundError
+from alba.security import verify_password
 
 
 class DocumentService:
@@ -42,3 +44,19 @@ class DecreeService:
 
     def add_decrees(self, decrees: list[models.Decree]):
         self.repository.save_all(decrees)
+
+
+class UserService:
+    def __init__(self, repository: repositories.UserRepository):
+        self.repository = repository
+
+    def login(self, username: str, password: str):
+        user = self.repository.find_by_username(username)
+
+        if user is None:
+            raise NotFoundError("User not found")
+
+        if not verify_password(password, user.password):
+            raise InvalidPasswordError("Invalid password")
+
+        return user

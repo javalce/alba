@@ -3,10 +3,19 @@ import uuid
 from typing import Annotated, Any
 
 from dependency_injector.wiring import Provide, inject
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    Security,
+    UploadFile,
+)
 from pydantic import BaseModel, ConfigDict
 
 from alba.milvus_database import MilvusDatabase
+from alba.security import jwt_required
 from alba.services import DocumentService
 
 
@@ -25,7 +34,11 @@ class DocumentResponse(BaseModel):
     total: int
 
 
-router = APIRouter(prefix="/documents", tags=["document"])
+router = APIRouter(
+    prefix="/documents",
+    tags=["document"],
+    dependencies=[Security(jwt_required)],
+)
 
 
 @inject

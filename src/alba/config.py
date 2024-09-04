@@ -1,3 +1,4 @@
+from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Union
@@ -43,6 +44,10 @@ class Config(BaseSettings):
     CHUNK_TEXT_SIZE: int = Field(default=1000)
     LOG_PATH: str = Field(default="logs/log.log")
     FALSE_POSITIVES_FILE: str = Field(default="config/false_positives.txt")
+    JWT_SECRET_KEY: str = Field(default=...)
+    JWT_ALGORITHM: str = Field(default="HS256")
+    JWT_ACCESS_TOKEN_EXPIRE_SECONDS: int | timedelta = Field(default=timedelta(hours=1))
+    JWT_REFRESH_TOKEN_EXPIRE_SECONDS: int | timedelta = Field(default=timedelta(days=7))
 
 
 @lru_cache

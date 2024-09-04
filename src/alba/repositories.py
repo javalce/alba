@@ -1,3 +1,5 @@
+import uuid
+
 from sqlalchemy import delete, func, select
 from sqlalchemy_toolkit import SQLAlchemyRepository
 
@@ -56,3 +58,12 @@ class DecreeRepository(SQLAlchemyRepository[models.Decree, int]):
     def save_all(self, decrees: list[models.Decree]):
         self.session.add_all(decrees)
         self.session.commit()
+
+
+class UserRepository(SQLAlchemyRepository[models.User, uuid.UUID]):
+    entity_class = models.User
+
+    def find_by_username(self, username: str):
+        query = select(models.User).where(models.User.username == username)
+
+        return self.session.execute(query).scalar_one_or_none()

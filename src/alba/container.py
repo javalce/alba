@@ -6,8 +6,8 @@ from alba.config import Config
 from alba.document_engine import DocumentEngine
 from alba.memory.long_term_memory import LongTermMemory
 from alba.milvus_database import MilvusDatabase
-from alba.repositories import DecreeRepository, DocumentRepository
-from alba.services import DecreeService, DocumentService
+from alba.repositories import DecreeRepository, DocumentRepository, UserRepository
+from alba.services import DecreeService, DocumentService, UserService
 from alba.utils.ner_extraction import EntityExtractor
 
 
@@ -31,6 +31,10 @@ class Container(containers.DeclarativeContainer):
     document_repository = providers.Singleton(DocumentRepository)
 
     document_service = providers.Singleton(DocumentService, repository=document_repository)
+
+    user_repository = providers.Singleton(UserRepository)
+
+    user_service = providers.Singleton(UserService, repository=user_repository)
 
     document_engine = providers.Singleton(
         DocumentEngine,

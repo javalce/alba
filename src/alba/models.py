@@ -10,6 +10,8 @@ from sqlalchemy import UUID, Date, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy_toolkit import Entity
 
+from alba.security import get_password_hash
+
 
 class Document(Entity):
     __tablename__ = "documents"
@@ -80,4 +82,12 @@ class User(Entity):
         "id", UUID, primary_key=True, nullable=False, default=uuid.uuid4()
     )
     username: Mapped[str] = mapped_column("username", String(255), nullable=False, index=True)
-    password: Mapped[str] = mapped_column("password", String(255), nullable=False)
+    __password: Mapped[str] = mapped_column("password", String(255), nullable=False)
+
+    @property
+    def password(self):
+        return self.__password
+
+    @password.setter
+    def password(self, password: str):
+        self.__password = get_password_hash(password)

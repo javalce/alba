@@ -145,7 +145,7 @@ docker-compose.yaml
 *.sqlite
 data/
 logs/
-
-# Ignore other files
 .git
 .gitignore
+evals/
+LICENSE

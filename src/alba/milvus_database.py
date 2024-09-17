@@ -8,7 +8,7 @@ from fastapi import UploadFile
 from milvus_model.hybrid import BGEM3EmbeddingFunction
 from milvus_model.sparse import BM25EmbeddingFunction
 from milvus_model.sparse.bm25.tokenizers import build_default_analyzer
-from pymilvus import Collection, DataType, FieldSchema, MilvusClient, connections
+from pymilvus import Collection, DataType, FieldSchema, MilvusClient
 from pymilvus.orm.schema import CollectionSchema
 from tqdm import tqdm
 
@@ -32,13 +32,16 @@ class MilvusDatabase:
         ner_extractor: EntityExtractor,
     ):
         self.config = config
-        self.__client = self.__connect()
+        self.__client = MilvusClient(uri=self.config.MILVUS_URI)
         self.__doc_engine = document_engine
 
         self.ner_extractor = ner_extractor
 
         self.__dense_ef = self.__load_dense_embedding()
         self.__sparse_ef = self.__load_sparse_embedding()
+
+    def __del__(self):
+        self.__client.close()
 
     @property
     def docs(self):
@@ -94,13 +97,6 @@ class MilvusDatabase:
             return_sparse=False,  # Los dispersos los tomaremos de bm25
         )
         return bgeM3_ef
-
-    def __connect(self):
-        host = self.config.MILVUS_HOST
-        port = self.config.MILVUS_PORT
-        connections.connect(host=host, port=port)
-        client = MilvusClient(host=host, port=port)
-        return client
 
     def __get_docs_schema(self) -> CollectionSchema:
         """

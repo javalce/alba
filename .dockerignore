@@ -149,3 +149,4 @@ logs/
 .gitignore
 evals/
 LICENSE
+Makefile

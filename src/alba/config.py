@@ -69,10 +69,8 @@ class ProductionConfig(Config):
 @lru_cache
 def get_config() -> Config:
     environment = os.getenv("ENVIRONMENT", "development")
-    print(f"Environment: {environment}")
 
     if environment.lower() == "production":
-        print("Production environment detected.")
         return ProductionConfig()
 
     return Config()

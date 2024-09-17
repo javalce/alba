@@ -11,6 +11,7 @@ def create_app():
 
     app = FastAPI(
         title="Alba - Asistente de Búsqueda Local y Privado",
+        root_path=container.config().ROOT_PATH,
     )
     app.state.container = container
 

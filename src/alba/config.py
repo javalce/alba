@@ -25,6 +25,7 @@ class Config(BaseSettings):
         case_sensitive=True,
     )
 
+    ROOT_PATH: str = Field(default="")
     DB_URL: str = Field(default=f"sqlite:///{BASE_DIR}/db.sqlite")
     MODEL_API_URL: str = Field(default="http://localhost:11434/api/generate")
     TEMPLATES_PATH: str = Field(default="src/alba/templates/template.json")

@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -50,6 +51,28 @@ class Config(BaseSettings):
     JWT_REFRESH_TOKEN_EXPIRE_SECONDS: int | timedelta = Field(default=timedelta(days=7))
 
 
+class ProductionConfig(Config):
+    """
+    A class for managing production configuration settings.
+
+    This class extends the Config class and sets the configuration settings
+    for a production environment.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=(BASE_DIR / ".env", BASE_DIR / ".env.production"),
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+    )
+
+
 @lru_cache
-def get_config():
+def get_config() -> Config:
+    environment = os.getenv("ENVIRONMENT", "development")
+    print(f"Environment: {environment}")
+
+    if environment.lower() == "production":
+        print("Production environment detected.")
+        return ProductionConfig()
+
     return Config()

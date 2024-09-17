@@ -2,7 +2,7 @@ from dependency_injector import containers, providers
 from sqlalchemy_toolkit import DatabaseManager
 
 from alba.chatbot import Chatbot
-from alba.config import Config
+from alba.config import get_config
 from alba.document_engine import DocumentEngine
 from alba.memory.long_term_memory import LongTermMemory
 from alba.milvus_database import MilvusDatabase
@@ -14,7 +14,7 @@ from alba.utils.ner_extraction import EntityExtractor
 class Container(containers.DeclarativeContainer):
     wiring_config = containers.WiringConfiguration(packages=["alba.router"])
 
-    config = providers.Singleton(Config)
+    config = providers.Singleton(get_config)
 
     ner_extractor = providers.Singleton(
         EntityExtractor,

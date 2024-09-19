@@ -1,7 +1,8 @@
 from typing import Annotated, Any
 
 from dependency_injector.wiring import Provide, inject
-from fastapi import APIRouter, Depends, Form, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel as PydanticBaseModel
 from pydantic import ConfigDict
 
@@ -38,12 +39,11 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/login", response_model=LoginResponse)
 @inject
 def login(
-    username: Annotated[str, Form(max_length=255)],
-    password: Annotated[str, Form(max_length=255)],
+    data: Annotated[OAuth2PasswordRequestForm, Depends()],
     user_service: UserService = Depends(Provide["user_service"]),
 ) -> Any:
     try:
-        user = user_service.login(username, password)
+        user = user_service.login(data.username, data.password)
 
         access_token = create_access_token(user.username)
         refresh_token = create_refresh_token(user.username)

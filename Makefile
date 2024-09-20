@@ -6,6 +6,9 @@ build: ## Docker compose build
 	docker compose build
 shell: ## Shell into container
 	docker compose exec alba_api bash
+prepare: ## Prepare the environment
+	sudo mkdir -p volumes.prod
+	sudo touch volumes.prod/db.sqlite
 
 
 

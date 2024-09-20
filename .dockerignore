@@ -138,6 +138,7 @@ tests/
 # docker files
 Dockerfile
 docker-compose.yaml
+.dockerignore
 
 # project specific files
 *.sqlite3
@@ -150,3 +151,4 @@ logs/
 evals/
 LICENSE
 Makefile
+volumes*/

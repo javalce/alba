@@ -36,3 +36,6 @@ db/
 *.sqlite3
 *.sqlite
 *.db
+
+# Other files
+volumes*/

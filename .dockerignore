@@ -137,8 +137,8 @@ tests/
 
 # docker files
 Dockerfile
-docker-compose.yaml
 .dockerignore
+docker
 
 # project specific files
 *.sqlite3

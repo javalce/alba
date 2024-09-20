@@ -1,11 +1,13 @@
+COMPOSE_FILE=docker/docker-compose.yaml
+
 up: ## Docker compose up
-	docker compose up -d --build
+	docker compose -f $(COMPOSE_FILE) up -d
 down: ## Docker compose down
-	docker compose down
+	docker compose -f $(COMPOSE_FILE) down
 build: ## Docker compose build
-	docker compose build
+	docker compose -f $(COMPOSE_FILE) build
 shell: ## Shell into container
-	docker compose exec alba_api bash
+	docker exec alba_api bash
 prepare: ## Prepare the environment
 	sudo mkdir -p volumes.prod
 	sudo touch volumes.prod/db.sqlite

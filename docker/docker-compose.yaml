@@ -69,8 +69,8 @@ services:
 
   alba_api:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../
+      dockerfile: docker/Dockerfile
     image: alba-api
     container_name: alba-api
     ports:

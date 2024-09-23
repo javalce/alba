@@ -1,4 +1,6 @@
 COMPOSE_FILE=docker/docker-compose.yaml
+_SUCCESS="\033[32m[%s]\033[0m %s\n" # Green text for "printf"
+_DANGER="\033[31m[%s]\033[0m %s\n" # Red text for "printf"
 
 up: ## Docker compose up
 	docker compose -f $(COMPOSE_FILE) up -d
@@ -7,10 +9,17 @@ down: ## Docker compose down
 build: ## Docker compose build
 	docker compose -f $(COMPOSE_FILE) build
 shell: ## Shell into container
-	docker exec alba_api bash
+	docker compose -f $(COMPOSE_FILE) exec alba_api bash
 prepare: ## Prepare the environment
 	sudo mkdir -p volumes.prod
 	sudo touch volumes.prod/db.sqlite
+ollama: ## Initialize ollama model
+	docker compose -f $(COMPOSE_FILE) exec -d ollama ollama run llama3
+clean: ## Delete persistent data
+	@read -p "Are you sure? [y/N] " ans && ans=$${ans:-N} ; \
+    	if [ $${ans} = y ] || [ $${ans} = Y ]; then \
+	        sudo rm -fr volumes.prod ; \
+	fi
 
 
 

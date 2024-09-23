@@ -8,7 +8,7 @@ services:
       - ETCD_QUOTA_BACKEND_BYTES=4294967296
       - ETCD_SNAPSHOT_COUNT=50000
     volumes:
-      - ./volumes.prod/etcd:/etcd
+      - ../volumes.prod/etcd:/etcd
     command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
     healthcheck:
       test: ['CMD', 'etcdctl', 'endpoint', 'health']
@@ -26,7 +26,7 @@ services:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
     volumes:
-      - ./volumes.prod/minio:/minio_data
+      - ../volumes.prod/minio:/minio_data
     command: minio server /minio_data --console-address ":9001"
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
@@ -47,7 +47,7 @@ services:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
     volumes:
-      - ./volumes.prod/milvus:/var/lib/milvus
+      - ../volumes.prod/milvus:/var/lib/milvus
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:9091/healthz']
       interval: 30s
@@ -76,7 +76,7 @@ services:
     ports:
       - 127.0.0.1:8001:8000
     volumes:
-      - ./volumes.prod/db.sqlite:/app/db.sqlite
+      - ../volumes.prod/db.sqlite:/app/db.sqlite
     restart: unless-stopped
     depends_on:
       - standalone

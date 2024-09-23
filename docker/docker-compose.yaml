@@ -81,6 +81,8 @@ services:
     volumes:
       - ../volumes.prod/db.sqlite:/app/db.sqlite
     restart: unless-stopped
+    environment:
+      - OLLAMA_HOST=ollama
     depends_on:
       - standalone
       - ollama

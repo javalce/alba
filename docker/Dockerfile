@@ -29,6 +29,7 @@ ENV NLTK_DATA=/app/nltk_data
 RUN . .venv/bin/activate \
     && python -m spacy download es_core_news_lg
 RUN . .venv/bin/activate \
+    && python -m nltk.downloader punkt_tab -d ${NLTK_DATA} \
     && python -m nltk.downloader stopwords -d ${NLTK_DATA}
 
 # BUILDER

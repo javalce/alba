@@ -62,8 +62,11 @@ services:
       - milvus
 
   ollama:
-    image: ollama/ollama:0.3.10
+    image: ollama/ollama:latest
+    pull_policy: always
     container_name: ollama
+    volumes:
+      - ../volumes.prod/ollama:/root/.ollama
     networks:
       - ollama
 

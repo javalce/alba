@@ -8,7 +8,7 @@ from fastapi import UploadFile
 from milvus_model.hybrid import BGEM3EmbeddingFunction
 from milvus_model.sparse import BM25EmbeddingFunction
 from milvus_model.sparse.bm25.tokenizers import build_default_analyzer
-from pymilvus import Collection, DataType, FieldSchema, MilvusClient
+from pymilvus import Collection, DataType, FieldSchema, MilvusClient, connections
 from pymilvus.orm.schema import CollectionSchema
 from tqdm import tqdm
 
@@ -32,6 +32,7 @@ class MilvusDatabase:
         ner_extractor: EntityExtractor,
     ):
         self.config = config
+        connections.connect(uri=self.config.MILVUS_URI)
         self.__client = MilvusClient(uri=self.config.MILVUS_URI)
         self.__doc_engine = document_engine
 

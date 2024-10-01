@@ -1,4 +1,6 @@
 # Local application imports
+import re
+
 from alba.config import Config
 from alba.memory.long_term_memory import LongTermMemory
 from alba.memory.short_term_memory import ShortTermMemory
@@ -75,11 +77,18 @@ class Chatbot:
         context, sources = self.long_term_mem.get_context(query)
         llm_prompt = TemplateManager.get("llm_prompt", query=query, context=context)
 
-        response = self.resp_engine.generate_response(llm_prompt)
-        response_n_sources = f"{response}\n\n{sources}"
-        self.short_term_mem.add_message({"role": "assistant", "content": response_n_sources})
+        response_n_sources = ""
 
-        return response_n_sources
+        for response in self.resp_engine.generate_response(llm_prompt):
+            response_n_sources += response
+            yield response
+
+        yield "\n\n"
+        yield from re.findall(r"\S+|\s+", sources)
+
+        response_n_sources = f"\n\n{sources}"
+
+        self.short_term_mem.add_message({"role": "assistant", "content": response_n_sources})
 
     def respond_w_context(self, user_prompt):
         """
@@ -95,8 +104,11 @@ class Chatbot:
         context, sources = self.long_term_mem.get_context(user_prompt)
         llm_prompt = TemplateManager.get("llm_prompt", query=user_prompt, context=context)
 
-        response = self.resp_engine.generate_response(llm_prompt)
-        response_n_context = f"RESPONSE: {response}\n\nCONTEXT: {context}"
+        response_n_context = "RESPONSE: "
+        for response in self.resp_engine.generate_response(llm_prompt):
+            response_n_context += response
+        response_n_context += f"\n\nCONTEXT: {context}"
+
         return response_n_context
 
     def _create_query(self, prompt, recent_messages):

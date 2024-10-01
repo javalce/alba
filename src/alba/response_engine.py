@@ -1,5 +1,5 @@
 # Standard library imports
-from typing import Any
+from typing import Any, Iterator
 
 # Third-party imports
 from ollama import chat
@@ -36,7 +36,7 @@ class ResponseEngine:
         """
         self._model = model_name
 
-    def generate_response(self, llm_prompt: str) -> str:
+    def generate_response(self, llm_prompt: str) -> Iterator[str]:
         """
         Generate a response based on the enriched query (llm_prompt) using the loaded model or strategy.
 
@@ -58,6 +58,5 @@ class ResponseEngine:
         ]
 
         # Send the messages to the chat model
-        response = chat(self.config.DEFAULT_INFERENCE_MODEL, messages=messages, stream=False)
-
-        return response["message"]["content"]
+        for response in chat(self.config.DEFAULT_INFERENCE_MODEL, messages=messages, stream=True):
+            yield response["message"]["content"]

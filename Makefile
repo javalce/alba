@@ -18,7 +18,7 @@ ollama: ## Initialize ollama model
 clean: ## Delete persistent data
 	@read -p "Are you sure you want to delete these directories? [y/N] " confirm && \
 	if [ "$$confirm" = "y" ]; then \
-		rm -rf volumes.prod; \
+		sudo rm -rf volumes.prod; \
 	else \
 		echo "Abort"; \
 	fi

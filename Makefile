@@ -11,14 +11,14 @@ build: ## Docker compose build
 shell: ## Shell into container
 	docker compose -f $(COMPOSE_FILE) exec alba_api bash
 prepare: ## Prepare the environment
-	sudo mkdir -p volumes.prod
-	sudo touch volumes.prod/db.sqlite
+	mkdir -p volumes.prod/{etcd,minio,milvus,ollama,logs}
+	touch volumes.prod/{db.sqlite,log.log}
 ollama: ## Initialize ollama model
 	docker compose -f $(COMPOSE_FILE) exec -d ollama ollama run llama3
 clean: ## Delete persistent data
 	@read -p "Are you sure? [y/N] " ans && ans=$${ans:-N} ; \
     	if [ $${ans} = y ] || [ $${ans} = Y ]; then \
-	        sudo rm -fr volumes.prod ; \
+	        rm -fr volumes.prod ; \
 	fi
 
 

@@ -52,8 +52,6 @@ ENV VIRTUAL_ENV=/app/.venv \
 COPY --from=builder ${VIRTUAL_ENV} ${VIRTUAL_ENV}
 COPY --from=development ${NLTK_DATA} ${NLTK_DATA}
 
-RUN mkdir -p /app/logs && touch /app/logs/log.log
-
 COPY . .
 
 EXPOSE 8000

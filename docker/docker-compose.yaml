@@ -79,6 +79,7 @@ services:
     ports:
       - 127.0.0.1:8001:8000
     volumes:
+      - ../volumes.prod/logs/log.log:/app/logs/log.log
       - ../volumes.prod/db.sqlite:/app/db.sqlite
     restart: unless-stopped
     environment:

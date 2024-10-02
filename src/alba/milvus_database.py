@@ -46,12 +46,11 @@ class MilvusDatabase:
     def __load_collections(self):
         if self.__client.has_collection(DOCS_COLLECTION_NAME):
             self.__client.load_collection(DOCS_COLLECTION_NAME)
+            self.docs = Collection(DOCS_COLLECTION_NAME)
 
         if self.__client.has_collection(CHUNKS_COLLECTION_NAME):
             self.__client.load_collection(CHUNKS_COLLECTION_NAME)
-
-        self.docs = Collection(DOCS_COLLECTION_NAME)
-        self.chunks = Collection(CHUNKS_COLLECTION_NAME)
+            self.chunks = Collection(CHUNKS_COLLECTION_NAME)
 
     def __load_sparse_embedding(self, corpus=None):
         # More info here: https://milvus.io/docs/embed-with-bm25.md

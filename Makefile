@@ -11,14 +11,16 @@ build: ## Docker compose build
 shell: ## Shell into container
 	docker compose -f $(COMPOSE_FILE) exec alba_api bash
 prepare: ## Prepare the environment
-	mkdir -p volumes.prod/{etcd,minio,milvus,ollama,logs}
-	touch volumes.prod/{db.sqlite,log.log}
+	@bash -c 'mkdir -p volumes.prod/{etcd,minio,milvus,ollama,logs}'
+	@bash -c 'touch volumes.prod/{db.sqlite,logs/log.log}'
 ollama: ## Initialize ollama model
 	docker compose -f $(COMPOSE_FILE) exec -d ollama ollama run llama3
 clean: ## Delete persistent data
-	@read -p "Are you sure? [y/N] " ans && ans=$${ans:-N} ; \
-    	if [ $${ans} = y ] || [ $${ans} = Y ]; then \
-	        rm -fr volumes.prod ; \
+	@read -p "Are you sure you want to delete these directories? [y/N] " confirm && \
+	if [ "$$confirm" = "y" ]; then \
+		rm -rf volumes.prod; \
+	else \
+		echo "Abort"; \
 	fi
 
 

@@ -91,12 +91,15 @@ class Chatbot:
 
         for response in self.resp_engine.generate_response(llm_prompt):
             response_n_sources += response
-            yield response
+            yield f'0:"{response}"\n'
 
-        yield "\n\n"
-        yield from re.findall(r"\S+|\s+", sources)
+        for item in re.split(r"(\S+)", f"\n\n{sources}"):
+            item = item.replace("\n", "\\n")
+            yield f'0:"{item}"\n'
 
-        response_n_sources = f"\n\n{sources}"
+        response_n_sources += f"\n\n{sources}"
+
+        logging.info(f"Response with sources: {response_n_sources}")
 
         self.short_term_mem.add_message({"role": "assistant", "content": response_n_sources})
 

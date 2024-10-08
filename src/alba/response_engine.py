@@ -1,4 +1,5 @@
 # Standard library imports
+import logging
 from typing import Any, Iterator
 
 # Third-party imports
@@ -7,6 +8,9 @@ from ollama import chat
 # Local application imports
 from alba.config import get_config
 from alba.templates.template_manager import TemplateManager
+from alba.utils.utils import setup_logging
+
+setup_logging()
 
 
 class ResponseEngine:
@@ -57,6 +61,13 @@ class ResponseEngine:
             },
         ]
 
+        logging.info(f"Generating response for prompt: {llm_prompt}")
+
         # Send the messages to the chat model
+        chat_response = ""
         for response in chat(self.config.DEFAULT_INFERENCE_MODEL, messages=messages, stream=True):
-            yield response["message"]["content"]
+            content = response["message"]["content"]
+            chat_response += content
+            yield content
+
+        logging.info(f"Generated response: {chat_response}")

@@ -1,4 +1,5 @@
 # Local application imports
+import logging
 import re
 
 from alba.config import Config
@@ -6,6 +7,9 @@ from alba.memory.long_term_memory import LongTermMemory
 from alba.memory.short_term_memory import ShortTermMemory
 from alba.response_engine import ResponseEngine
 from alba.templates.template_manager import TemplateManager
+from alba.utils.utils import setup_logging
+
+setup_logging()
 
 
 class Chatbot:
@@ -69,13 +73,19 @@ class Chatbot:
         """
         self.short_term_mem.add_message({"role": "user", "content": user_prompt})
 
+        logging.info("Processing user prompt...")
+
         # Create a self-contained query from recent chat history and the user's prompt
         recent_messages = self.short_term_mem.recall_messages(limit=5, to_str=True)
         query = self._create_query(user_prompt, recent_messages)
 
+        logging.info("Retrieving context...")
+
         # Enrich the query with relevant facts from long-term memory
         context, sources = self.long_term_mem.get_context(query)
         llm_prompt = TemplateManager.get("llm_prompt", query=query, context=context)
+
+        logging.info("Generating response...")
 
         response_n_sources = ""
 

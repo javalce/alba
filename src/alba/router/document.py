@@ -88,6 +88,7 @@ def reset_documents(
         document_service.delete_all()
         milvus_db.clear_database()
         milvus_db.initialize()
+        milvus_db.load_collections()
     except Exception as e:
         raise HTTPException(
             status_code=500, detail="There was an error while resetting the documents"

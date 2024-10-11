@@ -41,9 +41,9 @@ class MilvusDatabase:
         self.__dense_ef = self.__load_dense_embedding()
         self.__sparse_ef = self.__load_sparse_embedding()
 
-        self.__load_collections()
+        self.load_collections()
 
-    def __load_collections(self):
+    def load_collections(self):
         if self.__client.has_collection(DOCS_COLLECTION_NAME):
             self.__client.load_collection(DOCS_COLLECTION_NAME)
             self.docs = Collection(DOCS_COLLECTION_NAME)

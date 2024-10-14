@@ -1,5 +1,3 @@
-from typing import List
-
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
@@ -16,12 +14,17 @@ class Message(BaseModel):
 
 
 class Messages(BaseModel):
-    messages: List[Message]
+    messages: list[Message]
 
 
 @router.post("")
 @inject
 def chat(data: Messages, chatbot: Chatbot = Depends(Provide["chatbot"])):
-    message = data.messages[-1]
+    messages = data.messages
 
-    return StreamingResponse(chatbot.respond_w_sources(message.content))
+    if len(messages) == 1:
+        response_generator = chatbot.respond_w_sources(messages[-1].content)
+    else:
+        response_generator = chatbot.respond_w_messages([m.model_dump() for m in messages])
+
+    return StreamingResponse(response_generator)

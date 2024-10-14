@@ -40,7 +40,7 @@ class ResponseEngine:
         """
         self._model = model_name
 
-    def generate_response(self, llm_prompt: str) -> Iterator[str]:
+    def generate_response(self, llm_prompt: str | list[dict[str, Any]]) -> Iterator[str]:
         """
         Generate a response based on the enriched query (llm_prompt) using the loaded model or strategy.
 
@@ -55,13 +55,14 @@ class ResponseEngine:
                 "role": "system",
                 "content": TemplateManager.get("system_message", model=self._model),
             },
-            {
-                "role": "user",
-                "content": llm_prompt,
-            },
         ]
 
-        logging.info(f"Generating response for prompt: {llm_prompt}")
+        if isinstance(llm_prompt, list):
+            messages.extend(llm_prompt)
+            logging.info(f"Generating response for prompt: {llm_prompt[-1]["content"]}")
+        else:
+            messages.append({"role": "user", "content": llm_prompt})
+            logging.info(f"Generating response for prompt: {llm_prompt}")
 
         # Send the messages to the chat model
         chat_response = ""

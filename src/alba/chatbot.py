@@ -1,6 +1,7 @@
 # Local application imports
 import logging
 import re
+from typing import Any, Iterator
 
 from alba.config import Config
 from alba.memory.long_term_memory import LongTermMemory
@@ -61,7 +62,7 @@ class Chatbot:
         """
         self.long_term_mem.delete_documents(collections)
 
-    def respond_w_sources(self, user_prompt):
+    def respond_w_sources(self, user_prompt: str) -> Iterator[str]:
         """
         Respond to a user prompt with sources.
 
@@ -100,6 +101,27 @@ class Chatbot:
         logging.info(f"Response with sources: {response_n_sources}")
 
         self.short_term_mem.add_message({"role": "assistant", "content": response_n_sources})
+
+    def respond_w_messages(self, messages: dict[str, Any]) -> Iterator[str]:
+        """
+        Respond to a user chat history.
+
+        Args:
+            messages (dict[str, Any]): The user's chat history.
+
+        Returns:
+            str: The response.
+        """
+
+        self.short_term_mem.add_message(messages[-1])
+
+        message = ""
+
+        for response in self.resp_engine.generate_response(messages):
+            message += response
+            yield response
+
+        self.short_term_mem.add_message(message)
 
     def respond_w_context(self, user_prompt):
         """

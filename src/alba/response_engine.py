@@ -59,7 +59,7 @@ class ResponseEngine:
 
         if isinstance(llm_prompt, list):
             messages.extend(llm_prompt)
-            logging.info(f"Generating response for prompt: {llm_prompt[-1]["content"]}")
+            logging.info(f"Generating response for prompt: {llm_prompt[-1]['content']}")
         else:
             messages.append({"role": "user", "content": llm_prompt})
             logging.info(f"Generating response for prompt: {llm_prompt}")

@@ -74,17 +74,17 @@ class Chatbot:
         """
         self.short_term_mem.add_message({"role": "user", "content": user_prompt})
 
-        logging.info("Processing user prompt...")
+        # logging.info("Processing user prompt...")
 
         # Create a self-contained query from recent chat history and the user's prompt
-        recent_messages = self.short_term_mem.recall_messages(limit=5, to_str=True)
-        query = self._create_query(user_prompt, recent_messages)
+        # recent_messages = self.short_term_mem.recall_messages(limit=5, to_str=True)
+        # query = self._create_query(user_prompt, recent_messages)
 
         logging.info("Retrieving context...")
 
         # Enrich the query with relevant facts from long-term memory
-        context, sources = self.long_term_mem.get_context(query)
-        llm_prompt = TemplateManager.get("llm_prompt", query=query, context=context)
+        context, sources = self.long_term_mem.get_context(user_prompt)
+        llm_prompt = TemplateManager.get("llm_prompt", query=user_prompt, context=context)
 
         logging.info("Generating response...")
 
@@ -113,15 +113,7 @@ class Chatbot:
             str: The response.
         """
 
-        self.short_term_mem.add_message(messages[-1])
-
-        message = ""
-
-        for response in self.resp_engine.generate_response(messages):
-            message += response
-            yield response
-
-        self.short_term_mem.add_message(message)
+        yield from self.resp_engine.generate_response(messages)
 
     def respond_w_context(self, user_prompt):
         """

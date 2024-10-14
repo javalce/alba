@@ -11,18 +11,18 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-langchain = "0.3.2"
-pymilvus = "2.4.7"
+langchain = "0.3.3"
+pymilvus = "2.4.8"
 milvus-model = "0.2.7"
 pymupdf = "1.24.11"
 ollama = "0.3.3"
 tqdm = "4.66.5"
 torch = "2.4.1"
 tenacity = "8.5.0"
-openai = "1.51.0"
+openai = "1.51.2"
 pandas = "2.2.3"
 openpyxl = "3.1.5"
-transformers = "4.45.1"
+transformers = "4.45.2"
 spacy = "3.7.5"
 fpdf = "1.7.2"
 pypdf2 = "3.0.1"
@@ -30,7 +30,7 @@ camelot-py = "0.11.0"
 opencv-python = "4.10.0.82"
 ghostscript = "0.7"
 pydantic-settings = "2.5.2"
-fastapi = { extras = ["standard"], version = "0.115.0" }
+fastapi = { extras = ["standard"], version = "0.115.2" }
 dependency-injector = "4.42.0"
 sqlalchemy = "2.0.35"
 sqlalchemy-toolkit = "0.1.1"
@@ -43,7 +43,7 @@ gunicorn = "23.0.0"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "0.6.9"
-black = "24.8.0"
+black = "24.10.0"
 
 [tool.poetry.scripts]
 alba = "alba_cli.cli:main"

@@ -1,6 +1,4 @@
 COMPOSE_FILE=docker/docker-compose.yaml
-_SUCCESS="\033[32m[%s]\033[0m %s\n" # Green text for "printf"
-_DANGER="\033[31m[%s]\033[0m %s\n" # Red text for "printf"
 
 up: ## Docker compose up
 	docker compose -f $(COMPOSE_FILE) up -d

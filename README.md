@@ -11,20 +11,20 @@ This repository contains the implementation of a fully private, fully offline, L
 - **Retrieval-Augmented Generation (RAG)**: Combines the benefits of retrieval-based and generative approaches for nuanced and context-aware conversations.
 - **Privacy-First**: Built with privacy as a core principle, ensuring that all data stays on your device.
 
-## Setup
+## Requirements
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/pablovazquezg/alba.git
-   ```
-2. Navigate to the cloned directory:
-   ```bash
-   cd alba
-   ```
-3. Install dependencies:
-   ```bash
-   poetry install
-   ```
+- Python 3.11+
+- [Poetry](https://python-poetry.org/)
+- [Docker](https://www.docker.com/)
+
+## Installation
+
+> [!IMPORTANT]
+> Make sure you are using the branch `sedipualba-chat`.
+
+```bash
+poetry install
+```
 
 ### Post-Installation
 
@@ -45,25 +45,96 @@ This will download the punkt tokenizer for NLTK.
 > [!IMPORTANT]
 > You will need to have a milvus database running and a ollama server with the model loaded in order to use the chatbot.
 >
-> The ollama model is specified in the `config/config.py` file under the `DEFAULT_INFERENCE_MODEL` key. It defaults to `llama3`.
+> The ollama model is specified in the `config/config.py` file under the `DEFAULT_INFERENCE_MODEL` key. It defaults to `llama3.2`.
 
 ### Environment Variables
 
-You can create a `.env` file in the root directory of the project to customize the behavior of the chatbot. The following environment variables are supported:
+You can create a `.env` file in the root directory of the project to customize the behavior of the chatbot. The following environment variables are required:
+
+- `JWT_SECRET`: The secret key used to sign the JWT tokens. Use `openssl rand -hex 32` to generate a random key.
+
+You can check the `src/alba/config.py` file to see the available environment variables.
 
 ## Usage
 
 Launch the chatbot by running:
 
 ```bash
-streamlit run main.py
+# Activate the virtual environment
+poetry shell
+
+# Run the chatbot
+alba run
 ```
 
-Interact with the chatbot through the streamlit GUI.
+Interact with the chatbot through the API endpoints. The chatbot docs will be available at `http://localhost:8000/docs` or `http://localhost:8000/redoc` for the Swagger or ReDoc documentation, respectively.
 
-## Configuration
+## Deployment
 
-To configure the chatbot settings, refer to the `config/config.json` file where you can adjust various parameters such as model settings, privacy options, etc.
+To deploy the chatbot, you must use the provided `docker-compose.yaml` file. This file contains the necessary configuration to run the chatbot in a production environment.
+
+### Prerequisites
+
+Create a `.env.production` file in the root directory of the project with the following environment variables:
+
+- `JWT_SECRET`: The secret key used to sign the JWT tokens. Use `openssl rand -hex 32` to generate a random key.
+- `MODEL_API_URL`: The URI of the Ollama server. If using docker compose, use `http://ollama:11434/api/generate`.
+- `MILVUS_URI`: The URI of the Milvus database. If using docker compose, use `http://standalone:19530`.
+
+### Pre-Deployment
+
+Before deploying the chatbot, you must create the persistent volumes for the Milvus, Ollama and Chatbot services. To do this, run the following command:
+
+```bash
+mkdir -p volumes.prod/{etcd,minio,milvus,ollama,logs}
+touch volumes.prod/{db.sqlite,logs/log.log}
+```
+
+After creating the volumes, you have to build the Docker images. To do this, run the following command:
+
+```bash
+docker-compose -f docker/docker-compose.yaml build
+```
+
+### Deployment
+
+To deploy the chatbot, run the following command:
+
+```bash
+docker-compose -f docker/docker-compose.yaml up -d
+```
+
+To access the chatbot container, run the following command:
+
+```bash
+docker compose -f docker/docker-compose.yaml exec alba_api bash
+```
+
+### Post-Deployment
+
+After deploying the chatbot, you will need to execute the ollama model. To do this, run the following command:
+
+```bash
+docker compose -f docker/docker-compose.yaml exec -d ollama ollama run llama3.2
+```
+
+> [!NOTE]
+> You will have to wait a few minutes for the ollama model to download the necessary files and be ready to generate responses.
+
+## Makefile
+
+The project includes a `Makefile` with several useful commands to simplify the development process. To see the available commands, run:
+
+```bash
+make help # or just make
+```
+
+The commands for the deployment process are:
+
+- `make prepare`: Prepares the environment for deployment.
+- `make build`: Builds the Docker images.
+- `make up`: Deploys the chatbot.
+- `make ollama`: Executes the ollama model.
 
 ## License
 

@@ -67,6 +67,7 @@ services:
     container_name: ollama
     volumes:
       - ../volumes.prod/ollama:/root/.ollama
+    restart: unless-stopped
     networks:
       - ollama
 

@@ -16,6 +16,8 @@ This repository contains the implementation of a fully private, fully offline, L
 - Python 3.11+
 - [Poetry](https://python-poetry.org/)
 - [Docker](https://www.docker.com/)
+- [Milvus](https://milvus.io)
+- [Ollama](https://ollama.com)
 
 ## Installation
 
@@ -24,6 +26,16 @@ This repository contains the implementation of a fully private, fully offline, L
 
 ```bash
 poetry install
+```
+
+When you install the project with Poetry, it will automatically install the CLI tool for the chatbot. To see the available commands, run:
+
+```bash
+# Activate the virtual environment
+poetry shell
+
+# Run the ALBA CLI
+alba --help
 ```
 
 ### Post-Installation
@@ -46,6 +58,16 @@ This will download the punkt tokenizer for NLTK.
 > You will need to have a milvus database running and a ollama server with the model loaded in order to use the chatbot.
 >
 > The ollama model is specified in the `config/config.py` file under the `DEFAULT_INFERENCE_MODEL` key. It defaults to `llama3.2`.
+
+You also need to setup the Milvus and the SQLite database to store the chatbot data. You can use the CLI provided:
+
+```bash
+# Activate the virtual environment
+poetry shell
+
+# Run the ALBA CLI
+alba db init
+```
 
 ### Environment Variables
 
@@ -112,7 +134,13 @@ docker compose -f docker/docker-compose.yaml exec alba_api bash
 
 ### Post-Deployment
 
-After deploying the chatbot, you will need to execute the ollama model. To do this, run the following command:
+After deploying the chatbot, you will need to initialize the Milvus and SQLite databases. To do this, run the following command:
+
+```bash
+docker compose -f docker/docker-compose.yaml exec alba_api alba db init
+```
+
+After that you need to execute the ollama model. To do this, run the following command:
 
 ```bash
 docker compose -f docker/docker-compose.yaml exec -d ollama ollama run llama3.2
@@ -134,6 +162,7 @@ The commands for the deployment process are:
 - `make prepare`: Prepares the environment for deployment.
 - `make build`: Builds the Docker images.
 - `make up`: Deploys the chatbot.
+- `make initdb`: Initializes Milvus and SQLite databases.
 - `make ollama`: Executes the ollama model.
 
 ## License

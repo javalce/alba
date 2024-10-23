@@ -39,7 +39,7 @@ services:
 
   standalone:
     container_name: milvus-standalone
-    image: milvusdb/milvus:v2.4.11
+    image: milvusdb/milvus:v2.4.13-gpu-hotfix
     command: ['milvus', 'run', 'standalone']
     security_opt:
       - seccomp:unconfined
@@ -48,12 +48,13 @@ services:
       MINIO_ADDRESS: minio:9000
     volumes:
       - ../volumes.prod/milvus:/var/lib/milvus
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:9091/healthz']
-      interval: 30s
-      start_period: 90s
-      timeout: 20s
-      retries: 3
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: ['gpu']
+              device_ids: ['0']
     restart: unless-stopped
     depends_on:
       - etcd
@@ -67,6 +68,13 @@ services:
     container_name: ollama
     volumes:
       - ../volumes.prod/ollama:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: ['gpu']
+              device_ids: ['0']
     restart: unless-stopped
     networks:
       - ollama

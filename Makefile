@@ -13,6 +13,8 @@ prepare: ## Prepare the environment
 	@bash -c 'touch volumes.prod/{db.sqlite,logs/log.log}'
 ollama: ## Initialize ollama model
 	docker compose -f $(COMPOSE_FILE) exec -d ollama ollama run llama3.2
+initdb: ## Initialize the database
+	docker compose -f $(COMPOSE_FILE) exec -d alba_api alba db init
 clean: ## Delete persistent data
 	@read -p "Are you sure you want to delete these directories? [y/N] " confirm && \
 	if [ "$$confirm" = "y" ]; then \
@@ -25,6 +27,6 @@ clean: ## Delete persistent data
 
 .PHONY: help
 help:
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST)  | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST)  | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
 .DEFAULT_GOAL := help

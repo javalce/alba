@@ -112,7 +112,15 @@ mkdir -p volumes.prod/{etcd,minio,milvus,ollama,logs}
 touch volumes.prod/{db.sqlite,logs/log.log}
 ```
 
-After creating the volumes, you have to build the Docker images. To do this, run the following command:
+Also, because of ollama will use the GPU, you need to create the `.env` file in the `docker` directory with the following environment variables:
+
+- `GPU_ID`: The ID of the GPU to use. Use `nvidia-smi` to get the ID of the GPU.
+
+```bash
+echo "GPU_ID=0" > docker/.env
+```
+
+After that, you need to build the Docker images. To do this, run the following command:
 
 ```bash
 docker-compose -f docker/docker-compose.yaml build
@@ -164,6 +172,13 @@ The commands for the deployment process are:
 - `make up`: Deploys the chatbot.
 - `make initdb`: Initializes Milvus and SQLite databases.
 - `make ollama`: Executes the ollama model.
+
+> [!IMPORTANT]
+> The `make prepare` command will not create the `docker/.env` file. You will need to create it manually.
+
+### Additional Commands
+
+- `make useradd`: Adds a new user to the chatbot.
 
 ## License
 

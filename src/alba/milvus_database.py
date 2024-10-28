@@ -86,8 +86,8 @@ class MilvusDatabase:
         # Más información aquí: https://milvus.io/docs/embed-with-bgm-m3.md
         bgeM3_ef = BGEM3EmbeddingFunction(
             model_name="BAAI/bge-m3",  # Especifica el nombre del modelo
-            device="cuda:0" if torch.cuda.is_available() else "cpu",
-            use_fp16=torch.cuda.is_available(),  # Usa FP16 si está en CUDA, de lo contrario False
+            device="cpu",
+            use_fp16=False,  # Usa FP16 si está en CUDA, de lo contrario False
             return_colbert_vecs=False,  # No se necesitan vectores de salida de COLBERT
             return_dense=True,  # Vectores densos para búsqueda semántica
             return_sparse=False,  # Los dispersos los tomaremos de bm25

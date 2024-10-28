@@ -11,7 +11,7 @@ services:
       - ../volumes.prod/etcd:/etcd
     command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
     healthcheck:
-      test: ['CMD', 'etcdctl', 'endpoint', 'health']
+      test: ["CMD", "etcdctl", "endpoint", "health"]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -29,7 +29,7 @@ services:
       - ../volumes.prod/minio:/minio_data
     command: minio server /minio_data --console-address ":9001"
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -39,8 +39,8 @@ services:
 
   standalone:
     container_name: milvus-standalone
-    image: milvusdb/milvus:v2.4.13-gpu-hotfix
-    command: ['milvus', 'run', 'standalone']
+    image: milvusdb/milvus:v2.4.13-hotfix
+    command: ["milvus", "run", "standalone"]
     security_opt:
       - seccomp:unconfined
     environment:
@@ -48,13 +48,12 @@ services:
       MINIO_ADDRESS: minio:9000
     volumes:
       - ../volumes.prod/milvus:/var/lib/milvus
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              capabilities: ['gpu']
-              device_ids: ['0']
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      start_period: 90s
+      timeout: 20s
+      retries: 3
     restart: unless-stopped
     depends_on:
       - etcd
@@ -73,8 +72,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              capabilities: ['gpu']
-              device_ids: ['0']
+              capabilities: ["gpu"]
+              device_ids: ["0"]
     restart: unless-stopped
     networks:
       - ollama

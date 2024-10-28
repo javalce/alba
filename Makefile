@@ -15,6 +15,8 @@ ollama: ## Initialize ollama model
 	docker compose -f $(COMPOSE_FILE) exec -d ollama ollama run llama3.2
 initdb: ## Initialize the database
 	docker compose -f $(COMPOSE_FILE) exec -d alba_api alba db init
+useradd: ## Add a user
+	docker compose -f $(COMPOSE_FILE) exec alba_api alba user add
 clean: ## Delete persistent data
 	@read -p "Are you sure you want to delete these directories? [y/N] " confirm && \
 	if [ "$$confirm" = "y" ]; then \
